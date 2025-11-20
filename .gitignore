@@ -1,0 +1,69 @@
+# Environment files
+.env
+.env.local
+.env.*.local
+*.env
+
+# Logs
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Build outputs
+dist/
+build/
+*.out
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Dependencies
+node_modules/
+vendor/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+*.iml
+
+# OS
+.DS_Store
+Thumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+._*
+
+# Testing
+coverage/
+.nyc_output/
+*.test
+*.spec
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.temp
+*.bak
+*.cache
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+postgres-data/
+
+# Secrets & Credentials
+*.pem
+*.key
+*.cert
+*secret*
+*credentials*.json
+firebase-credentials.json

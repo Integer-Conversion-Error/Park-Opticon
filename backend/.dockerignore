@@ -1,0 +1,35 @@
+# Binaries
+bin/
+dist/
+server
+*.exe
+
+# Go
+*.test
+*.out
+coverage.txt
+coverage.html
+
+# Environment
+.env
+.env.local
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Git
+.git/
+.gitignore
+
+# Documentation (we want this in the image, so don't ignore)
+# README.md
+# *.md
