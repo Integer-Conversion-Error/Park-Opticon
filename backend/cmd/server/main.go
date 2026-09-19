@@ -1,9 +1,15 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"log"
+	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
@@ -11,7 +17,6 @@ import (
 	"github.com/solace-esadnkaya/parkopticon-backend/internal/database"
 	"github.com/solace-esadnkaya/parkopticon-backend/internal/mockrouter"
 	"github.com/solace-esadnkaya/parkopticon-backend/internal/router"
-	"github.com/solace-esadnkaya/parkopticon-backend/internal/worker"
 )
 
 func main() {
@@ -26,6 +31,9 @@ func main() {
 
 	// Load configuration
 	cfg := config.Load()
+	if err := cfg.Validate(); err != nil {
+		log.Fatalf("❌ Invalid configuration: %v", err)
+	}
 
 	// Set Gin mode
 	if cfg.Server.Env == "production" {
@@ -39,7 +47,7 @@ func main() {
 		log.Println("🧪 Starting in MOCK MODE - Serving immutable test data")
 		log.Println("📝 No database connection required")
 		log.Println("⚠️  All changes are temporary and will not be persisted")
-		
+
 		// Initialize mock router (no database needed)
 		r = mockrouter.Setup(cfg)
 
@@ -75,14 +83,6 @@ func main() {
 		// Initialize router with database
 		r = router.Setup(db, cfg)
 
-		// Start background workers
-		alertWorker := worker.NewAlertChecker(db, cfg)
-		go alertWorker.Start()
-		log.Println("✅ Background alert checker started")
-
-		expiryWorker := worker.NewExpiryChecker(db)
-		go expiryWorker.Start()
-		log.Println("✅ Background expiry checker started")
 	}
 
 	// Start server
@@ -91,12 +91,34 @@ func main() {
 	if *mockMode {
 		mode = "MOCK"
 	}
-	
+
 	log.Printf("🌐 Server starting on %s (MODE: %s, ENV: %s)", addr, mode, cfg.Server.Env)
 	log.Printf("📍 Health check: http://localhost%s/health", addr)
 	log.Printf("📍 API docs: http://localhost%s/api/v1/", addr)
 
-	if err := r.Run(addr); err != nil {
-		log.Fatalf("❌ Failed to start server: %v", err)
+	server := &http.Server{
+		Addr:           addr,
+		Handler:        r,
+		ReadTimeout:    cfg.Server.ReadTimeout,
+		WriteTimeout:   cfg.Server.WriteTimeout,
+		IdleTimeout:    cfg.Server.IdleTimeout,
+		MaxHeaderBytes: 1 << 20,
+	}
+	serverErrors := make(chan error, 1)
+	go func() { serverErrors <- server.ListenAndServe() }()
+
+	shutdownSignal := make(chan os.Signal, 1)
+	signal.Notify(shutdownSignal, syscall.SIGINT, syscall.SIGTERM)
+	select {
+	case err := <-serverErrors:
+		if err != nil && err != http.ErrServerClosed {
+			log.Fatalf("❌ Failed to start server: %v", err)
+		}
+	case <-shutdownSignal:
+		shutdownContext, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		if err := server.Shutdown(shutdownContext); err != nil {
+			log.Printf("⚠️ Graceful shutdown failed: %v", err)
+		}
 	}
 }

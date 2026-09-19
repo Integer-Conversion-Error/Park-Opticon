@@ -1,126 +1,56 @@
-# 📚 Parkopticon Documentation
+# Park Opticon documentation
 
-Complete documentation for the Parkopticon parking app project.
+This page is the documentation entry point. The repository contains several
+older planning, design, and setup snapshots; they are retained for context but
+are not current operating instructions.
 
----
+## Maintained guides
 
-## 🗂️ Documentation Structure
+| Need | Guide |
+| --- | --- |
+| Project overview and local startup | [Root README](../README.md) |
+| Backend API, worker, and alert design | [Backend architecture](backend/ARCHITECTURE.md) |
+| Backend endpoints and test workflow | [API testing](backend/API_TESTING.md) |
+| Docker development and deployment limits | [Docker quick start](backend/QUICKSTART_DOCKER.md) |
+| Backend runtime configuration | [Backend README](../backend/README.md) |
+| Database migration rules | [Migration README](../backend/migrations/README.md) |
+| Admin-portal setup and current capabilities | [Admin portal README](admin-portal/README.md) |
+| Current mobile UI and interaction contract | [Mobile design reference](design/DESIGN_QUICK_REF.md) |
+| Current-state and release risks | [Prelaunch audit](audit/PRELAUNCH_AUDIT.md) |
 
-### 🔧 Setup (`/setup`)
-Everything you need to get your development environment running.
+## Current product scope
 
-- **[START_HERE.md](../START_HERE.md)** - Begin here! Quick orientation guide
-- **[QUICK_START.md](setup/QUICK_START.md)** - 5-minute fast setup
-- **[SETUP_GUIDE.md](setup/SETUP_GUIDE.md)** - Complete step-by-step guide (1,200+ lines)
-- **[INSTALLATION_STEPS.md](setup/INSTALLATION_STEPS.md)** - Terminal commands only
-- **[CHECKLIST.md](setup/CHECKLIST.md)** - Verification checklist (800+ lines)
-- **[MY_PROGRESS.md](setup/MY_PROGRESS.md)** - Track your setup progress
+- The mobile MVP comprises authentication, map, reports, parking-session,
+  profile, and settings screens. Removed legacy demo/alerts/tickets screens
+  are not part of the application.
+- The Go backend owns authorization and uses PostgreSQL + PostGIS. The mobile
+  client does not access database tables directly.
+- Parked-car alerts are event-driven. The API writes durable jobs and an
+  independent worker handles spatial matching and push delivery.
+- The admin portal is a real API client, but several UI/analytics features are
+  still incomplete or depend on backend endpoints that do not exist. Consult
+  the audit before treating it as release-ready.
 
-### 🎨 Design (`/design`)
-UX research, screen definitions, and Figma specifications.
+## Reference material
 
-- **[DESIGN_QUICK_REF.md](design/DESIGN_QUICK_REF.md)** - ⭐ Start here! Quick overview
-- **[UX_ANALYSIS.md](design/UX_ANALYSIS.md)** - Complete UX analysis (18 screens, personas, flows)
-- **[FIGMA_DESIGN_SPEC.md](design/FIGMA_DESIGN_SPEC.md)** - Step-by-step Figma guide
+### Design and planning
 
-### 💻 Development (`/development`)
-Project structure, roadmap, and development guides.
+[DESIGN_QUICK_REF.md](design/DESIGN_QUICK_REF.md) is the maintained contract
+for the current mobile UI. The other files under `design/` and
+`development/ROADMAP.md` are design/planning references, not a contract for
+the currently shipped screens or features.
 
-- **[PROJECT_STRUCTURE.md](development/PROJECT_STRUCTURE.md)** - Code organization
-- **[ROADMAP.md](development/ROADMAP.md)** - Development timeline
+### Historical setup and implementation snapshots
 
----
+Most files under `project/`, the `*_COMPLETE.md` backend files, and
+`setup/MY_PROGRESS.md` describe prior milestones. Each now has a status note
+pointing back here. Do not rely on their commands, file lists, feature claims,
+or deployment assertions without checking the maintained guides above.
 
-## 🚀 Quick Navigation
+## Documentation conventions
 
-### I want to...
-
-#### Set up my development environment
-1. Read [START_HERE.md](../START_HERE.md)
-2. Follow [QUICK_START.md](setup/QUICK_START.md) for fast setup
-3. OR follow [SETUP_GUIDE.md](setup/SETUP_GUIDE.md) for complete guide
-4. Verify with [CHECKLIST.md](setup/CHECKLIST.md)
-
-#### Design the app in Figma
-1. Read [DESIGN_QUICK_REF.md](design/DESIGN_QUICK_REF.md) (5 min overview)
-2. Review [UX_ANALYSIS.md](design/UX_ANALYSIS.md) (understand all screens)
-3. Follow [FIGMA_DESIGN_SPEC.md](design/FIGMA_DESIGN_SPEC.md) (create designs)
-
-#### Start coding
-1. Review [PROJECT_STRUCTURE.md](development/PROJECT_STRUCTURE.md)
-2. Check [ROADMAP.md](development/ROADMAP.md)
-3. Start with Map View screen (see UX_ANALYSIS.md)
-
-#### Understand the big picture
-1. [COMPLETE_SUMMARY.md](../COMPLETE_SUMMARY.md) - Everything in one place
-2. [INDEX.md](../INDEX.md) - Master file index
-
----
-
-## 📊 Documentation Stats
-
-- **Total Files:** 13 markdown files
-- **Total Lines:** ~6,500 lines
-- **Setup Guides:** 5 files
-- **Design Docs:** 3 files
-- **Development Docs:** 2 files
-- **Overview Docs:** 3 files
-
----
-
-## 🎯 Current Status
-
-✅ **Setup Phase:** Complete
-- Environment configured
-- Dependencies installed
-- Expo server running
-
-🎨 **Design Phase:** In Progress
-- All screens defined
-- Figma specs ready
-- Awaiting design work
-
-💻 **Development Phase:** Not Started
-- Project structure ready
-- Theme system created
-- Awaiting screen implementation
-
----
-
-## 📖 Reading Order
-
-### For Beginners
-1. START_HERE.md
-2. QUICK_START.md
-3. DESIGN_QUICK_REF.md
-4. PROJECT_STRUCTURE.md
-
-### For Complete Setup
-1. START_HERE.md
-2. SETUP_GUIDE.md
-3. CHECKLIST.md
-4. MY_PROGRESS.md
-
-### For Designers
-1. DESIGN_QUICK_REF.md
-2. UX_ANALYSIS.md
-3. FIGMA_DESIGN_SPEC.md
-
-### For Developers
-1. PROJECT_STRUCTURE.md
-2. ROADMAP.md
-3. UX_ANALYSIS.md (to understand features)
-4. FIGMA_DESIGN_SPEC.md (to see design system)
-
----
-
-## 🔗 Quick Links
-
-- **Main Project:** [../parkopticon/](../parkopticon/)
-- **Source Code:** [../parkopticon/src/](../parkopticon/src/)
-- **Documentation Root:** [./](.)
-- **Root README:** [../README.md](../README.md)
-
----
-
-**Last Updated:** November 7, 2025
+- Source code and runtime migrations are the authority for behavior.
+- A document marked **Historical reference** is retained intentionally, but
+  its implementation claims may no longer apply.
+- Production readiness claims require the real-device, provider, HTTPS,
+  backup, monitoring, and release checks listed in the prelaunch audit.

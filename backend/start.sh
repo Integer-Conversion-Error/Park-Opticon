@@ -31,7 +31,7 @@ elif [ "$MODE" = "full" ]; then
     echo ""
     echo "Features:"
     echo "  - Full database persistence"
-    echo "  - Background workers enabled"
+    echo "  - Run ./start-worker.sh or 'go run cmd/worker/main.go' separately for alert delivery"
     echo "  - Production-ready"
     echo ""
     

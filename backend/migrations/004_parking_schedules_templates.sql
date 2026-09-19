@@ -15,7 +15,7 @@ CREATE TABLE IF NOT EXISTS parking_spot_templates (
 -- Enforcement schedules for parking spots (can be associated with spots or templates)
 CREATE TABLE IF NOT EXISTS enforcement_schedules (
     id SERIAL PRIMARY KEY,
-    parking_spot_id INTEGER REFERENCES parking_spots(id) ON DELETE CASCADE,
+    parking_spot_id UUID REFERENCES parking_spots(id) ON DELETE CASCADE,
     template_id INTEGER REFERENCES parking_spot_templates(id) ON DELETE CASCADE,
     day_of_week INTEGER NOT NULL, -- 0=Sunday, 1=Monday, ..., 6=Saturday
     start_time TIME NOT NULL,
@@ -52,29 +52,29 @@ ON CONFLICT (name) DO NOTHING;
 -- Insert sample enforcement schedules for templates
 -- Standard Street Parking: Enforced Mon-Fri 8am-6pm, Free weekends
 INSERT INTO enforcement_schedules (template_id, day_of_week, start_time, end_time, schedule_type, description)
-SELECT id, 1, '08:00:00', '18:00:00', 'enforced', 'Monday enforcement'
+SELECT id, 1, '08:00:00'::TIME, '18:00:00'::TIME, 'enforced', 'Monday enforcement'
 FROM parking_spot_templates WHERE name = 'Standard Street Parking'
 UNION ALL
-SELECT id, 2, '08:00:00', '18:00:00', 'enforced', 'Tuesday enforcement'
+SELECT id, 2, '08:00:00'::TIME, '18:00:00'::TIME, 'enforced', 'Tuesday enforcement'
 FROM parking_spot_templates WHERE name = 'Standard Street Parking'
 UNION ALL
-SELECT id, 3, '08:00:00', '18:00:00', 'enforced', 'Wednesday enforcement'
+SELECT id, 3, '08:00:00'::TIME, '18:00:00'::TIME, 'enforced', 'Wednesday enforcement'
 FROM parking_spot_templates WHERE name = 'Standard Street Parking'
 UNION ALL
-SELECT id, 4, '08:00:00', '18:00:00', 'enforced', 'Thursday enforcement'
+SELECT id, 4, '08:00:00'::TIME, '18:00:00'::TIME, 'enforced', 'Thursday enforcement'
 FROM parking_spot_templates WHERE name = 'Standard Street Parking'
 UNION ALL
-SELECT id, 5, '08:00:00', '18:00:00', 'enforced', 'Friday enforcement'
+SELECT id, 5, '08:00:00'::TIME, '18:00:00'::TIME, 'enforced', 'Friday enforcement'
 FROM parking_spot_templates WHERE name = 'Standard Street Parking'
 UNION ALL
-SELECT id, 0, '00:00:00', '23:59:59', 'free', 'Sunday free parking'
+SELECT id, 0, '00:00:00'::TIME, '23:59:59'::TIME, 'free', 'Sunday free parking'
 FROM parking_spot_templates WHERE name = 'Standard Street Parking'
 UNION ALL
-SELECT id, 6, '00:00:00', '23:59:59', 'free', 'Saturday free parking'
+SELECT id, 6, '00:00:00'::TIME, '23:59:59'::TIME, 'free', 'Saturday free parking'
 FROM parking_spot_templates WHERE name = 'Standard Street Parking';
 
 -- Loading Zone: No parking all week 7am-7pm, loading only
 INSERT INTO enforcement_schedules (template_id, day_of_week, start_time, end_time, schedule_type, description)
-SELECT id, gs.day, '07:00:00', '19:00:00', 'no_parking', 'Loading only'
+SELECT id, gs.day, '07:00:00'::TIME, '19:00:00'::TIME, 'no_parking', 'Loading only'
 FROM parking_spot_templates, generate_series(0, 6) gs(day)
 WHERE name = 'Loading Zone';

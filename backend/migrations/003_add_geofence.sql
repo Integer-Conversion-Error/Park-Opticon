@@ -9,7 +9,7 @@ BEGIN
         WHERE table_name = 'parking_spots' AND column_name = 'geofence'
     ) THEN
         ALTER TABLE parking_spots 
-        ADD COLUMN geofence GEOGRAPHY(POLYGON, 4326);
+        ADD COLUMN geofence GEOMETRY(POLYGON, 4326);
         
         -- Create index on geofence
         CREATE INDEX idx_parking_spots_geofence ON parking_spots USING GIST(geofence);

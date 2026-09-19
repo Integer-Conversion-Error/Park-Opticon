@@ -13,22 +13,25 @@ RUN go mod download
 # Copy source code
 COPY . .
 
-# Build the application
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o server cmd/server/main.go
+# Build the HTTP API and the independent alert worker.
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o server cmd/server/main.go \
+    && CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o worker cmd/worker/main.go
 
 # Final stage
-FROM alpine:latest
+FROM alpine:3.21
 
 RUN apk --no-cache add ca-certificates tzdata
 
-WORKDIR /root/
+RUN addgroup -S parkopticon && adduser -S -G parkopticon -u 10001 parkopticon
+
+WORKDIR /app
 
 # Copy the binary from builder
-COPY --from=builder /app/server .
+COPY --from=builder /app/server /app/server
+COPY --from=builder /app/worker /app/worker
 
-# Copy .env file (will be overridden by docker-compose environment)
-COPY --from=builder /app/.env.example .env
+USER parkopticon
 
 EXPOSE 8080
 
-CMD ["./server"]
+CMD ["/app/server"]

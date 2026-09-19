@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # PostgreSQL with PostGIS
   postgres:
@@ -8,11 +6,12 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: parkopticon
-      POSTGRES_PASSWORD: parkopticon_dev_password
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in backend/.env}
       POSTGRES_DB: parkopticon_db
       PGDATA: /var/lib/postgresql/data/pgdata
     ports:
-      - "5432:5432"
+      # Host-side development tools can connect; remote hosts cannot.
+      - "127.0.0.1:5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
@@ -37,19 +36,40 @@ services:
       PORT: 8080
       ENV: development
       API_VERSION: v1
+      HTTP_READ_TIMEOUT: 15s
+      HTTP_WRITE_TIMEOUT: 15s
+      HTTP_IDLE_TIMEOUT: 60s
+      HTTP_MAX_BODY_BYTES: 1048576
       
       # Database - use service name 'postgres' as host
       DB_HOST: postgres
       DB_PORT: 5432
       DB_USER: parkopticon
-      DB_PASSWORD: parkopticon_dev_password
+      DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in backend/.env}
       DB_NAME: parkopticon_db
       DB_SSLMODE: disable
+      DB_SSLROOTCERT: ""
+      DB_CONNECT_TIMEOUT: 5s
+      DB_STATEMENT_TIMEOUT: 5s
+      DB_MAX_OPEN_CONNS: 20
+      DB_MAX_IDLE_CONNS: 5
+      DB_CONN_MAX_LIFETIME: 30m
+      DB_CONN_MAX_IDLE_TIME: 5m
       
       # JWT
       JWT_SECRET: dev_secret_change_in_production_please
-      JWT_ACCESS_EXPIRY: 1h
-      JWT_REFRESH_EXPIRY: 168h
+      JWT_ACCESS_EXPIRY: 15m
+      JWT_REFRESH_EXPIRY: 720h
+      MFA_ENCRYPTION_KEY: dev_mfa_key_change_in_production
+      ADMIN_MFA_STEP_UP: 10m
+      EXPO_PUSH_ACCESS_TOKEN: ${EXPO_PUSH_ACCESS_TOKEN:-}
+      GOOGLE_OAUTH_CLIENT_IDS: ${GOOGLE_OAUTH_CLIENT_IDS:-}
+      GOOGLE_OAUTH_SERVER_CLIENT_ID: ${GOOGLE_OAUTH_SERVER_CLIENT_ID:-}
+      GOOGLE_OAUTH_CLIENT_SECRET: ${GOOGLE_OAUTH_CLIENT_SECRET:-}
+      APPLE_OAUTH_CLIENT_IDS: ${APPLE_OAUTH_CLIENT_IDS:-}
+      OAUTH_CHALLENGE_EXPIRY: ${OAUTH_CHALLENGE_EXPIRY:-5m}
+      OAUTH_LINK_REAUTH_EXPIRY: ${OAUTH_LINK_REAUTH_EXPIRY:-5m}
+      OAUTH_JWKS_CACHE_TTL: ${OAUTH_JWKS_CACHE_TTL:-6h}
       
       # AWS (for later)
       AWS_REGION: us-east-1
@@ -57,13 +77,14 @@ services:
       AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
       S3_BUCKET_NAME: parkopticon-photos
       
-      # Workers
-      ALERT_CHECK_INTERVAL: 30s
-      SPOT_EXPIRY_CHECK_INTERVAL: 5m
-      
       # CORS - Allow all for development
       CORS_ALLOWED_ORIGINS: "*"
       CORS_ALLOW_CREDENTIALS: "true"
+      TRUSTED_PROXIES: ""
+      RATE_LIMIT_REQUESTS_PER_MINUTE: 120
+      RATE_LIMIT_AUTH_PER_MINUTE: 10
+      RATE_LIMIT_REPORTS_PER_HOUR: 20
+      RATE_LIMIT_ADMIN_PER_MINUTE: 120
       
       # Logging
       LOG_LEVEL: debug
@@ -79,6 +100,41 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
+
+  # Alert fan-out and Expo delivery run independently of API replicas. More
+  # workers can be added safely because they claim queue rows with SKIP LOCKED.
+  alert-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: parkopticon-alert-worker
+    command: ["/app/worker"]
+    restart: unless-stopped
+    environment:
+      ENV: development
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: parkopticon
+      DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in backend/.env}
+      DB_NAME: parkopticon_db
+      DB_SSLMODE: disable
+      DB_CONNECT_TIMEOUT: 5s
+      DB_STATEMENT_TIMEOUT: 5s
+      DB_MAX_OPEN_CONNS: 10
+      DB_MAX_IDLE_CONNS: 3
+      DB_CONN_MAX_LIFETIME: 30m
+      DB_CONN_MAX_IDLE_TIME: 5m
+      EXPO_PUSH_ACCESS_TOKEN: ${EXPO_PUSH_ACCESS_TOKEN:-}
+      ALERT_DISPATCH_INTERVAL: 1s
+      ALERT_DISPATCH_BATCH_SIZE: 25
+      PUSH_DELIVERY_BATCH_SIZE: 100
+      WORKER_JOB_LEASE: 2m
+      SPOT_EXPIRY_CHECK_INTERVAL: 5m
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - parkopticon-network
 
 networks:
   parkopticon-network:

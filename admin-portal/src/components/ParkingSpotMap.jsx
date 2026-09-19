@@ -7,11 +7,7 @@ import 'mapbox-gl/dist/mapbox-gl.css';
 // You'll need to add your Mapbox token in .env as VITE_MAPBOX_TOKEN
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN;
 
-if (!MAPBOX_TOKEN) {
-  console.warn('[ParkingSpotMap] VITE_MAPBOX_TOKEN is not set. Please add it to your .env file.');
-}
-
-export default function ParkingSpotMap({ spots = [], onSpotClick, selectedSpotId, onDrawComplete, onGeofenceUpdate }) {
+export default function ParkingSpotMap({ spots = [], onGeofenceUpdate }) {
   const [viewState, setViewState] = useState({
     latitude: 45.4215,
     longitude: -75.6972,
@@ -83,7 +79,6 @@ export default function ParkingSpotMap({ spots = [], onSpotClick, selectedSpotId
       if (feature.geometry.type === 'Polygon' && onGeofenceUpdate) {
         // Get coordinates in correct GeoJSON format
         const coordinates = feature.geometry.coordinates;
-        console.log('[ParkingSpotMap] Polygon created:', coordinates);
         onGeofenceUpdate(coordinates);
         
         // Clear the drawing after sending
@@ -95,7 +90,6 @@ export default function ParkingSpotMap({ spots = [], onSpotClick, selectedSpotId
       const feature = e.features[0];
       if (feature.geometry.type === 'Polygon' && onGeofenceUpdate) {
         const coordinates = feature.geometry.coordinates;
-        console.log('[ParkingSpotMap] Polygon updated:', coordinates);
         onGeofenceUpdate(coordinates);
       }
     });
@@ -111,20 +105,12 @@ export default function ParkingSpotMap({ spots = [], onSpotClick, selectedSpotId
   const spotsGeoJSON = {
     type: 'FeatureCollection',
     features: spots.map(spot => {
-      console.log('[ParkingSpotMap] Processing spot:', spot.id, {
-        hasGeofence: !!spot.geofence,
-        geofence: spot.geofence,
-        hasCorners: !!(spot.corner1_lat && spot.corner1_lon)
-      });
-
       // Priority 1: Check if spot has a geofence (admin-drawn polygon)
       if (spot.geofence) {
         try {
           const geofenceObj = typeof spot.geofence === 'string' 
             ? JSON.parse(spot.geofence) 
             : spot.geofence;
-          
-          console.log('[ParkingSpotMap] Parsed geofence:', geofenceObj);
           
           return {
             type: 'Feature',
@@ -137,8 +123,7 @@ export default function ParkingSpotMap({ spots = [], onSpotClick, selectedSpotId
               hasGeofence: true
             }
           };
-        } catch (e) {
-          console.error('[ParkingSpotMap] Failed to parse geofence for spot', spot.id, ':', e);
+        } catch {
           // Fall through to next option
         }
       }
@@ -186,8 +171,6 @@ export default function ParkingSpotMap({ spots = [], onSpotClick, selectedSpotId
       };
     })
   };
-
-  console.log('[ParkingSpotMap] Generated GeoJSON:', JSON.stringify(spotsGeoJSON, null, 2));
 
   return (
     <div className="relative w-full h-full">

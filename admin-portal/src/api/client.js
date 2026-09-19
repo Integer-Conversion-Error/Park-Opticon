@@ -1,6 +1,8 @@
 import axios from 'axios';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080/api/v1';
+const configuredURL = import.meta.env.VITE_API_URL;
+const API_BASE_URL = configuredURL || (import.meta.env.DEV ? 'http://localhost:8080/api/v1' : '');
+let accessToken = null;
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -9,41 +11,42 @@ const api = axios.create({
   },
 });
 
+api.interceptors.request.use((config) => {
+	if (!API_BASE_URL) return Promise.reject(new Error('VITE_API_URL must be configured for production builds.'));
+	return config;
+});
+
 // Add auth token to requests
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('admin_token');
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
+  if (accessToken) {
+    config.headers.Authorization = `Bearer ${accessToken}`;
   }
-  console.log('[API] Request:', config.method?.toUpperCase(), config.url, {
-    data: config.data,
-    headers: config.headers
-  });
   return config;
 });
 
 // Add response interceptor for logging
 api.interceptors.response.use(
-  (response) => {
-    console.log('[API] Response:', response.config.method?.toUpperCase(), response.config.url, {
-      status: response.status,
-      data: response.data
-    });
-    return response;
-  },
+  (response) => response,
   (error) => {
-    console.error('[API] Error:', error.config?.method?.toUpperCase(), error.config?.url, {
-      status: error.response?.status,
-      data: error.response?.data,
-      message: error.message
-    });
+	if (error.response?.status === 401) {
+		accessToken = null;
+		window.dispatchEvent(new Event('parkopticon:auth-expired'));
+	}
     return Promise.reject(error);
   }
 );
 
+export const setAccessToken = (token) => { accessToken = token || null; };
+export const clearAccessToken = () => { accessToken = null; };
+export const hasAccessToken = () => Boolean(accessToken);
+
 // Auth
 export const login = (email, password) => api.post('/auth/login', { email, password });
 export const getProfile = () => api.get('/profile');
+export const getMFAStatus = () => api.get('/auth/mfa/status');
+export const enrollMFA = () => api.post('/auth/mfa/enroll');
+export const confirmMFA = (code) => api.post('/auth/mfa/confirm', { code });
+export const verifyMFA = (code) => api.post('/auth/mfa/verify', { code });
 
 // Users
 export const getUsers = () => api.get('/admin/users');

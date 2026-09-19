@@ -11,8 +11,8 @@ services:
       POSTGRES_PASSWORD: ${DB_PASSWORD}  # Set in .env file
       POSTGRES_DB: parkopticon_db
       PGDATA: /var/lib/postgresql/data/pgdata
-    ports:
-      - "5432:5432"
+    expose:
+      - "5432"
     volumes:
       - /opt/parkopticon/postgres_data:/var/lib/postgresql/data
     networks:
@@ -24,37 +24,66 @@ services:
       retries: 5
 
   backend:
-    image: parkopticon/backend:latest
+    image: ${BACKEND_IMAGE:-parkopticon/backend:latest}
     container_name: parkopticon-backend-prod
     restart: always
     ports:
-      - "8080:8080"
+      # A TLS reverse proxy on the host should terminate public HTTPS and
+      # forward to this loopback-only listener. Override API_BIND_ADDRESS only
+      # when an equivalent network policy guarantees HTTPS before the API.
+      - "${API_BIND_ADDRESS:-127.0.0.1}:${API_PORT:-8080}:8080"
     environment:
       PORT: 8080
       ENV: production
       API_VERSION: v1
+      HTTP_READ_TIMEOUT: 15s
+      HTTP_WRITE_TIMEOUT: 15s
+      HTTP_IDLE_TIMEOUT: 60s
+      HTTP_MAX_BODY_BYTES: 1048576
       
       DB_HOST: postgres
       DB_PORT: 5432
       DB_USER: parkopticon
       DB_PASSWORD: ${DB_PASSWORD}
       DB_NAME: parkopticon_db
-      DB_SSLMODE: disable
+      # PostgreSQL is not exposed outside this private Compose network. A
+      # remote database must override this with verify-full and a CA bundle.
+      DB_SSLMODE: ${DB_SSLMODE:-disable}
+      DB_SSLROOTCERT: ${DB_SSLROOTCERT:-}
+      DB_ALLOW_INSECURE_LOCAL: "true"
+      DB_CONNECT_TIMEOUT: 5s
+      DB_STATEMENT_TIMEOUT: 5s
+      DB_MAX_OPEN_CONNS: 20
+      DB_MAX_IDLE_CONNS: 5
+      DB_CONN_MAX_LIFETIME: 30m
+      DB_CONN_MAX_IDLE_TIME: 5m
       
       JWT_SECRET: ${JWT_SECRET}
-      JWT_ACCESS_EXPIRY: 1h
-      JWT_REFRESH_EXPIRY: 168h
+      JWT_ACCESS_EXPIRY: 15m
+      JWT_REFRESH_EXPIRY: 720h
+      MFA_ENCRYPTION_KEY: ${MFA_ENCRYPTION_KEY}
+      ADMIN_MFA_STEP_UP: 10m
+      EXPO_PUSH_ACCESS_TOKEN: ${EXPO_PUSH_ACCESS_TOKEN}
+      GOOGLE_OAUTH_CLIENT_IDS: ${GOOGLE_OAUTH_CLIENT_IDS}
+      GOOGLE_OAUTH_SERVER_CLIENT_ID: ${GOOGLE_OAUTH_SERVER_CLIENT_ID}
+      GOOGLE_OAUTH_CLIENT_SECRET: ${GOOGLE_OAUTH_CLIENT_SECRET}
+      APPLE_OAUTH_CLIENT_IDS: ${APPLE_OAUTH_CLIENT_IDS}
+      OAUTH_CHALLENGE_EXPIRY: ${OAUTH_CHALLENGE_EXPIRY:-5m}
+      OAUTH_LINK_REAUTH_EXPIRY: ${OAUTH_LINK_REAUTH_EXPIRY:-5m}
+      OAUTH_JWKS_CACHE_TTL: ${OAUTH_JWKS_CACHE_TTL:-6h}
       
       AWS_REGION: ${AWS_REGION}
       AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
       AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
       S3_BUCKET_NAME: ${S3_BUCKET_NAME}
       
-      ALERT_CHECK_INTERVAL: 30s
-      SPOT_EXPIRY_CHECK_INTERVAL: 5m
-      
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS}
       CORS_ALLOW_CREDENTIALS: "true"
+      TRUSTED_PROXIES: ${TRUSTED_PROXIES:-}
+      RATE_LIMIT_REQUESTS_PER_MINUTE: 120
+      RATE_LIMIT_AUTH_PER_MINUTE: 10
+      RATE_LIMIT_REPORTS_PER_HOUR: 20
+      RATE_LIMIT_ADMIN_PER_MINUTE: 120
       
       LOG_LEVEL: info
       LOG_FORMAT: json
@@ -63,11 +92,62 @@ services:
         condition: service_healthy
     networks:
       - parkopticon-network
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/health"]
       interval: 30s
       timeout: 10s
       retries: 3
+
+  alert-worker:
+    image: ${BACKEND_IMAGE:-parkopticon/backend:latest}
+    container_name: parkopticon-alert-worker-prod
+    command: ["/app/worker"]
+    restart: always
+    environment:
+      ENV: production
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: parkopticon
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: parkopticon_db
+      DB_SSLMODE: ${DB_SSLMODE:-disable}
+      DB_SSLROOTCERT: ${DB_SSLROOTCERT:-}
+      DB_ALLOW_INSECURE_LOCAL: "true"
+      DB_CONNECT_TIMEOUT: 5s
+      DB_STATEMENT_TIMEOUT: 5s
+      DB_MAX_OPEN_CONNS: 10
+      DB_MAX_IDLE_CONNS: 3
+      DB_CONN_MAX_LIFETIME: 30m
+      DB_CONN_MAX_IDLE_TIME: 5m
+      JWT_SECRET: ${JWT_SECRET}
+      MFA_ENCRYPTION_KEY: ${MFA_ENCRYPTION_KEY}
+      EXPO_PUSH_ACCESS_TOKEN: ${EXPO_PUSH_ACCESS_TOKEN}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS}
+      CORS_ALLOW_CREDENTIALS: "true"
+      ALERT_DISPATCH_INTERVAL: 1s
+      ALERT_DISPATCH_BATCH_SIZE: 25
+      PUSH_DELIVERY_BATCH_SIZE: 100
+      WORKER_JOB_LEASE: 2m
+      SPOT_EXPIRY_CHECK_INTERVAL: 5m
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - parkopticon-network
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
 
 networks:
   parkopticon-network:

@@ -23,17 +23,17 @@ func New(cfg *config.Config) *MockHandlers {
 // Health check
 func (h *MockHandlers) Health(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
-		"status":     "ok",
-		"mode":       "mock",
-		"message":    "Park-Opticon API (Mock Mode - Immutable Test Data)",
-		"timestamp":  time.Now(),
-		"database":   "inmemory",
-		"users":      len(mockdata.MockUsers),
-		"spots":      len(mockdata.MockParkingSpots),
-		"alerts":     len(mockdata.MockEnforcementAlerts),
-		"vehicles":   len(mockdata.MockVehicles),
-		"sessions":   len(mockdata.MockParkingSessions),
-		"tickets":    len(mockdata.MockTickets),
+		"status":    "ok",
+		"mode":      "mock",
+		"message":   "Park-Opticon API (Mock Mode - Immutable Test Data)",
+		"timestamp": time.Now(),
+		"database":  "inmemory",
+		"users":     len(mockdata.MockUsers),
+		"spots":     len(mockdata.MockParkingSpots),
+		"alerts":    len(mockdata.MockEnforcementAlerts),
+		"vehicles":  len(mockdata.MockVehicles),
+		"sessions":  len(mockdata.MockParkingSessions),
+		"tickets":   len(mockdata.MockTickets),
 	})
 }
 
@@ -98,7 +98,7 @@ func (h *MockHandlers) Login(c *gin.Context) {
 
 func (h *MockHandlers) GetProfile(c *gin.Context) {
 	userID, _ := c.Get("user_id")
-	
+
 	user := mockdata.GetMockUserByID(userID.(uuid.UUID))
 	if user == nil {
 		user = &mockdata.MockUsers[0]
@@ -109,51 +109,45 @@ func (h *MockHandlers) GetProfile(c *gin.Context) {
 	})
 }
 
+// GetCommunityImpact derives the same event-backed fields as the live API
+// from immutable fixtures. Mock mode has no delivery or verification history,
+// so those counters remain zero rather than being invented for presentation.
+func (h *MockHandlers) GetCommunityImpact(c *gin.Context) {
+	userID, _ := c.Get("user_id")
+	id, ok := userID.(uuid.UUID)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not found"})
+		return
+	}
+
+	impact := models.CommunityImpact{}
+	for _, spot := range mockdata.MockParkingSpots {
+		if spot.ReporterID != nil && *spot.ReporterID == id {
+			impact.OpenSpotsShared++
+			if spot.VerifiedByCount > 0 {
+				impact.ReportsConfirmed++
+			}
+		}
+	}
+	for _, alert := range mockdata.MockEnforcementAlerts {
+		if alert.ReporterID != nil && *alert.ReporterID == id {
+			impact.EnforcementAlertsReported++
+			if alert.VerifiedByCount > 0 {
+				impact.ReportsConfirmed++
+			}
+		}
+	}
+	impact.ReportsShared = impact.OpenSpotsShared + impact.EnforcementAlertsReported
+
+	c.JSON(http.StatusOK, impact)
+}
+
 // Parking spots endpoints
 func (h *MockHandlers) GetNearbyParkingSpots(c *gin.Context) {
 	// In mock mode, return all parking spots
 	c.JSON(http.StatusOK, gin.H{
 		"spots": mockdata.MockParkingSpots,
 		"count": len(mockdata.MockParkingSpots),
-	})
-}
-
-func (h *MockHandlers) ReportParkingSpot(c *gin.Context) {
-	var req struct {
-		Latitude         float64 `json:"latitude" binding:"required"`
-		Longitude        float64 `json:"longitude" binding:"required"`
-		Address          string  `json:"address"`
-		StreetName       string  `json:"street_name"`
-		SpotType         string  `json:"spot_type"`
-		DurationEstimate int     `json:"duration_estimate"`
-		Notes            string  `json:"notes"`
-	}
-
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	// Create a new spot based on input (but don't persist)
-	spot := models.ParkingSpot{
-		ID:               uuid.New(),
-		Latitude:         req.Latitude,
-		Longitude:        req.Longitude,
-		Address:          &req.Address,
-		StreetName:       &req.StreetName,
-		SpotType:         &req.SpotType,
-		DurationEstimate: &req.DurationEstimate,
-		Notes:            &req.Notes,
-		Status:           "available",
-		VerifiedByCount:  0,
-		FlaggedCount:     0,
-		CreatedAt:        time.Now(),
-		ExpiresAt:        func() *time.Time { t := time.Now().Add(2 * time.Hour); return &t }(),
-	}
-
-	c.JSON(http.StatusCreated, gin.H{
-		"message": "Parking spot reported (mock - not persisted)",
-		"spot":    spot,
 	})
 }
 
@@ -222,7 +216,7 @@ func (h *MockHandlers) ResolveEnforcementAlert(c *gin.Context) {
 // Vehicle endpoints
 func (h *MockHandlers) GetVehicles(c *gin.Context) {
 	userID, _ := c.Get("user_id")
-	
+
 	// Filter vehicles by user
 	var userVehicles []models.Vehicle
 	for _, v := range mockdata.MockVehicles {
@@ -240,7 +234,7 @@ func (h *MockHandlers) GetVehicles(c *gin.Context) {
 // Parking session endpoints
 func (h *MockHandlers) GetParkingSessions(c *gin.Context) {
 	userID, _ := c.Get("user_id")
-	
+
 	// Filter sessions by user
 	var userSessions []models.ParkingSession
 	for _, s := range mockdata.MockParkingSessions {
@@ -258,7 +252,7 @@ func (h *MockHandlers) GetParkingSessions(c *gin.Context) {
 // Ticket endpoints
 func (h *MockHandlers) GetTickets(c *gin.Context) {
 	userID, _ := c.Get("user_id")
-	
+
 	// Filter tickets by user
 	var userTickets []models.Ticket
 	for _, t := range mockdata.MockTickets {

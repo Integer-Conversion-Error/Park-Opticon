@@ -49,6 +49,9 @@ logs/
 *.db
 *.sqlite
 postgres-data/
+*.dump
+*.dump.age
+*.dump.age.sha256
 
 # Temporary files
 tmp/

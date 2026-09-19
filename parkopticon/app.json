@@ -9,7 +9,7 @@
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
-      "backgroundColor": "#2196F3"
+      "backgroundColor": "#FFFFFF"
     },
     "assetBundlePatterns": [
       "**/*"
@@ -17,11 +17,10 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.parkopticon.app",
+      "usesAppleSignIn": true,
       "infoPlist": {
-        "NSLocationWhenInUseUsageDescription": "Parkopticon needs your location to show nearby parking spots and enforcement alerts.",
-        "NSCameraUsageDescription": "Parkopticon needs camera access to let you take photos of parking spots."
-      },
-      "newArchEnabled": false
+        "NSLocationWhenInUseUsageDescription": "Parkopticon uses your location to mark where you parked and place enforcement reports."
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -32,25 +31,24 @@
       "permissions": [
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION",
-        "CAMERA"
-      ],
-      "config": {
-        "googleMaps": {
-          "apiKey": "PASTE_YOUR_API_KEY_HERE"
-        }
-      },
-      "newArchEnabled": false
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      [
-        "expo-location",
-        {
-          "locationAlwaysAndWhenInUsePermission": "Allow Parkopticon to use your location to show nearby parking spots."
-        }
-      ]
-    ]
+      "expo-location",
+      "expo-secure-store",
+      "expo-notifications",
+      "expo-apple-authentication"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "69554c64-4de8-40e8-97ee-5d6f3e455c8b"
+      }
+    },
+    "owner": "esad_kaya"
   }
 }

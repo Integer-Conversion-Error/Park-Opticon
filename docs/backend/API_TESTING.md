@@ -1,282 +1,125 @@
-# 🧪 API Testing Guide
+# Backend API and test guide
 
-Quick reference for testing Park-Opticon backend endpoints.
+**Status — 2026-08-25:** routes below are derived from
+`backend/internal/router/router.go`. Use the API process and alert worker
+together for live parked-car alert testing.
 
----
+## Start the services
 
-## 🔧 Setup
+The easiest local path is Docker Compose:
 
-**Base URL:** `http://localhost:8080`
-
-**Headers for authenticated requests:**
-```
-Authorization: Bearer <access_token>
-Content-Type: application/json
-```
-
----
-
-## 1️⃣ Authentication
-
-### Register New User
-
-```powershell
-curl -X POST http://localhost:8080/api/v1/auth/register `
-  -H "Content-Type: application/json" `
-  -d '{
-    "email": "john@example.com",
-    "password": "password123",
-    "username": "johndoe",
-    "full_name": "John Doe"
-  }'
+```sh
+cd backend
+docker compose up --build
 ```
 
-**Response:**
-```json
-{
-  "access_token": "eyJhbGc...",
-  "refresh_token": "eyJhbGc...",
-  "user": {
-    "id": "uuid",
-    "email": "john@example.com",
-    "username": "johndoe",
-    "karma_points": 0
-  }
-}
+For a non-Docker workflow, start PostgreSQL + PostGIS first, then run these in
+separate terminals:
+
+```sh
+go run ./cmd/server
+go run ./cmd/worker
 ```
 
-### Login
+The API base URL is `http://localhost:8080`; all versioned endpoints are under
+`/api/v1`.
 
-```powershell
-curl -X POST http://localhost:8080/api/v1/auth/login `
-  -H "Content-Type: application/json" `
-  -d '{
-    "email": "john@example.com",
-    "password": "password123"
-  }'
+## Authentication
+
+Only registration, login, and token refresh are public.
+
+```sh
+curl -X POST http://localhost:8080/api/v1/auth/register \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"driver@example.com","password":"password123","username":"driver"}'
 ```
 
-### Get Profile
+Use the returned `access_token` for protected requests:
 
-```powershell
-curl http://localhost:8080/api/v1/profile `
-  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+```sh
+export TOKEN='…'
+curl http://localhost:8080/api/v1/profile \
+  -H "Authorization: Bearer $TOKEN"
 ```
 
----
+## Driver routes
 
-## 2️⃣ Parking Spots
+| Method | Path | Notes |
+| --- | --- | --- |
+| `GET` | `/feed/nearby` | Requires `latitude`, `longitude`; optional `radius_meters` is 1–2,500. Returns spots and enforcement alerts. |
+| `POST` | `/parking-sessions` | Starts the one active parking session for the user. Writes a durable alert lookup job. |
+| `GET` | `/parking-sessions/active` | Gets the caller's active session. |
+| `PATCH` | `/parking-sessions/:id/end` | Ends a session; optional `share_open_spot`. |
+| `POST` | `/parking-sessions/:id/feedback` | Saves a post-parking enforcement observation. |
+| `POST` | `/enforcement-alerts` | Creates or merges a `ticketing` or `chalking` report, then writes an alert job. |
+| `GET` | `/enforcement-alerts/nearby` | Nearby active enforcement reports. |
+| `PATCH` | `/enforcement-alerts/:id/resolve` | Resolves the caller's report or an admin's report. |
+| `POST` | `/enforcement-alerts/:id/verifications` | Confirms or denies an enforcement report. |
+| `GET` | `/parking-spots/nearby` | Nearby available spots. |
+| `PATCH` | `/parking-spots/:id/taken` | Marks a spot as taken. |
+| `POST` | `/parking-spots/:id/verifications` | Confirms or denies a parking report. |
+| `GET` | `/profile/community-impact` | Returns the caller's event-backed reports shared, reports confirmed, reports checked, and unique drivers alerted. It does not return a reputation score. |
+| `GET/PATCH` | `/profile/preferences` | Reads or changes alert preferences and radius. |
+| `PATCH` | `/profile/push-token` | Registers a device push token; `null` clears active devices for the account. |
+| `GET` | `/notifications` | Returns the caller's notification history and unread count. |
+| `PATCH` | `/notifications/:id/read` | Marks one notification read. |
+| `POST` | `/notifications/read-all` | Marks all notifications read. |
 
-### Report a Parking Spot
+### Parked-car alert smoke flow
 
-```powershell
-curl -X POST http://localhost:8080/api/v1/parking-spots `
-  -H "Authorization: Bearer YOUR_ACCESS_TOKEN" `
-  -H "Content-Type: application/json" `
-  -d '{
-    "latitude": 37.7749,
-    "longitude": -122.4194,
-    "address": "Market St & 5th St, San Francisco",
-    "street_name": "Market St",
-    "spot_type": "street",
-    "duration_estimate": 60,
-    "notes": "Spot right in front of coffee shop"
-  }'
-```
+1. Sign in on one account/device and register its Expo push token.
+2. Start a parking session near a test coordinate.
+3. From a different account, report `ticketing` or `chalking` within that
+   driver's configured radius.
+4. Confirm a notification row appears and, on a real configured device, the
+   Expo push is accepted. The queue worker runs on its configured short poll
+   interval rather than a global 30-second scan.
 
-### Get Nearby Parking Spots
+Example report:
 
-```powershell
-# San Francisco coordinates
-curl "http://localhost:8080/api/v1/parking-spots/nearby?latitude=37.7749&longitude=-122.4194&radius_miles=1.0" `
-  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
-```
-
-### Mark Spot as Taken
-
-```powershell
-curl -X PATCH http://localhost:8080/api/v1/parking-spots/SPOT_ID/taken `
-  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
-```
-
----
-
-## 3️⃣ Enforcement Alerts
-
-### Report Enforcement Activity
-
-```powershell
-curl -X POST http://localhost:8080/api/v1/enforcement-alerts `
-  -H "Authorization: Bearer YOUR_ACCESS_TOKEN" `
-  -H "Content-Type: application/json" `
+```sh
+curl -X POST http://localhost:8080/api/v1/enforcement-alerts \
+  -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
   -d '{
     "latitude": 37.7749,
     "longitude": -122.4194,
-    "address": "Valencia St & 16th St",
-    "street_name": "Valencia St",
     "enforcement_type": "ticketing",
-    "description": "Officer writing tickets for expired meters",
-    "severity": "high"
+    "severity": "high",
+    "description": "Test report"
   }'
 ```
 
-**Enforcement Types:**
-- `ticketing` - Officer writing tickets
-- `chalking` - Tire chalking for time limit enforcement
-- `towing` - Tow truck spotted
+## Admin routes
 
-**Severity:**
-- `low` - Single officer, routine patrol
-- `medium` - Active enforcement
-- `high` - Multiple officers, aggressive ticketing
+All admin routes require a JWT for an admin user and a current MFA step-up.
+Available groups are `/admin/users`, `/admin/parking-spots`,
+`/admin/templates`, and `/admin/enforcement-alerts`; parking spot routes also
+own the geofence endpoints. The source router is the authority for the exact
+route list.
 
-### Get Nearby Enforcement Alerts
+## Automated tests
 
-```powershell
-# All types
-curl "http://localhost:8080/api/v1/enforcement-alerts/nearby?latitude=37.7749&longitude=-122.4194&radius_miles=1.0" `
-  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
-
-# Filter by type
-curl "http://localhost:8080/api/v1/enforcement-alerts/nearby?latitude=37.7749&longitude=-122.4194&radius_miles=1.0&type=ticketing" `
-  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+```sh
+cd backend
+go test ./...
+go vet ./...
 ```
 
-### Resolve Enforcement Alert
+The PostGIS integration tests are intentionally opt-in to avoid modifying a
+developer's ordinary database. Point them at a disposable PostGIS database:
 
-```powershell
-curl -X PATCH http://localhost:8080/api/v1/enforcement-alerts/ALERT_ID/resolve `
-  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+```sh
+PARKOPTICON_TEST_DATABASE_URL='postgres://USER:PASSWORD@HOST:PORT/DATABASE?sslmode=disable' \
+  go test ./... -count=1
 ```
 
----
+Those tests cover API outbox writes, report-to-session fan-out, park-time
+matching, duplicate prevention, retry after a transient push-provider failure,
+and concurrent migration startup.
 
-## 🧪 Testing Workflow
+## Mock mode
 
-### Complete Test Scenario
-
-```powershell
-# 1. Register
-$response = Invoke-RestMethod -Method POST -Uri "http://localhost:8080/api/v1/auth/register" `
-  -ContentType "application/json" `
-  -Body '{"email":"test@test.com","password":"password123","username":"testuser"}'
-
-$token = $response.access_token
-Write-Host "Token: $token"
-
-# 2. Report a parking spot
-$spot = Invoke-RestMethod -Method POST -Uri "http://localhost:8080/api/v1/parking-spots" `
-  -Headers @{Authorization="Bearer $token"} `
-  -ContentType "application/json" `
-  -Body '{"latitude":37.7749,"longitude":-122.4194,"notes":"Test spot"}'
-
-Write-Host "Created spot: $($spot.id)"
-
-# 3. Find nearby spots
-$nearby = Invoke-RestMethod -Uri "http://localhost:8080/api/v1/parking-spots/nearby?latitude=37.7749&longitude=-122.4194" `
-  -Headers @{Authorization="Bearer $token"}
-
-Write-Host "Found $($nearby.count) spots"
-
-# 4. Report enforcement
-$alert = Invoke-RestMethod -Method POST -Uri "http://localhost:8080/api/v1/enforcement-alerts" `
-  -Headers @{Authorization="Bearer $token"} `
-  -ContentType "application/json" `
-  -Body '{"latitude":37.7749,"longitude":-122.4194,"enforcement_type":"ticketing","description":"Test alert","severity":"high"}'
-
-Write-Host "Created alert: $($alert.id)"
-
-# 5. Check profile (should have karma points now)
-$profile = Invoke-RestMethod -Uri "http://localhost:8080/api/v1/profile" `
-  -Headers @{Authorization="Bearer $token"}
-
-Write-Host "Karma points: $($profile.karma_points)"
-```
-
----
-
-## 📍 Test Locations
-
-Use these coordinates for testing:
-
-**San Francisco:**
-- Downtown: `37.7749, -122.4194`
-- Mission District: `37.7599, -122.4148`
-- Financial District: `37.7946, -122.3999`
-
-**New York:**
-- Times Square: `40.7580, -73.9855`
-- Central Park: `40.7829, -73.9654`
-
-**Los Angeles:**
-- Downtown: `34.0522, -118.2437`
-- Hollywood: `34.0928, -118.3287`
-
----
-
-## 🔍 Debugging Tips
-
-### Check server logs
-Look for these messages:
-- `✅ Database connected successfully`
-- `✅ Background alert checker started`
-- `📱 Would send push notification...`
-
-### Test geospatial queries directly
-
-```sql
--- Connect to database
-psql -h localhost -U parkopticon -d parkopticon_db
-
--- Check parking spots
-SELECT id, latitude, longitude, status, created_at
-FROM parking_spots
-ORDER BY created_at DESC
-LIMIT 5;
-
--- Find spots near a point
-SELECT 
-  id, 
-  ST_Distance(
-    location, 
-    ST_SetSRID(ST_MakePoint(-122.4194, 37.7749), 4326)::geography
-  ) / 1609.34 AS distance_miles
-FROM parking_spots
-WHERE ST_DWithin(
-  location,
-  ST_SetSRID(ST_MakePoint(-122.4194, 37.7749), 4326)::geography,
-  1609.34
-)
-ORDER BY distance_miles;
-```
-
----
-
-## 🚨 Common Issues
-
-**401 Unauthorized:**
-- Token expired (access tokens last 15 minutes)
-- Invalid token format
-- Missing `Bearer` prefix
-
-**400 Bad Request:**
-- Missing required fields
-- Invalid JSON format
-- Invalid latitude/longitude values
-
-**500 Internal Server Error:**
-- Database connection failed
-- PostGIS extension not enabled
-- Check server logs
-
----
-
-## 📊 Rate Limits
-
-- Report parking spot: 10 per hour
-- Report enforcement: 20 per hour
-- API requests: 100 per minute per user
-
----
-
-**Ready to test! 🚀**
+`go run ./cmd/server -mock` is useful only for immutable frontend fixtures. It
+does not run database migrations, the alert worker, or real notification
+delivery; do not use it to validate the live alert pipeline.

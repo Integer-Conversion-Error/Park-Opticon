@@ -120,14 +120,15 @@ export default function MapManager() {
   // Load all geofences when spots are loaded
   useEffect(() => {
     loadAllGeofences();
+    // The loader reads the latest spots state and is intentionally triggered by the collection.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [spots]);
 
   const loadSpots = async () => {
     try {
       const response = await getParkingSpots();
       setSpots(response.data || []);
-    } catch (error) {
-      console.error('Failed to load parking spots:', error);
+    } catch {
       setSpots([]);
     } finally {
       setLoading(false);
@@ -138,8 +139,7 @@ export default function MapManager() {
     try {
       const response = await getTemplates();
       setTemplates(response.data || []);
-    } catch (error) {
-      console.error('Failed to load templates:', error);
+    } catch {
       setTemplates([]);
     }
   };
@@ -166,8 +166,7 @@ export default function MapManager() {
         streetName: streetName,
         fullAddress: houseNumber ? `${houseNumber} ${streetName}` : fullAddress,
       };
-    } catch (error) {
-      console.error('Reverse geocoding failed:', error);
+    } catch {
       return { streetName: '', fullAddress: '' };
     }
   };
@@ -256,7 +255,6 @@ export default function MapManager() {
       setMessage({ type: 'success', text: `Spot created from template: ${template.name}` });
       await loadSpots();
     } catch (error) {
-      console.error('Failed to create spot from template:', error);
       setMessage({ type: 'error', text: error.response?.data?.error || 'Failed to create parking spot' });
     }
   };
@@ -410,8 +408,8 @@ export default function MapManager() {
               });
             }
           }
-        } catch (e) {
-          console.error('[MapManager] Failed to parse geofence for spot:', spot.id, e);
+        } catch {
+          return null;
         }
       }
     });

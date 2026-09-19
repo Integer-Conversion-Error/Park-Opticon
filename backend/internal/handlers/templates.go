@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"database/sql"
+	"fmt"
 	"log"
 	"net/http"
 	"strconv"
@@ -22,6 +23,10 @@ func NewTemplateHandler(db *sqlx.DB) *TemplateHandler {
 // GetAllTemplates returns all parking spot templates
 func (h *TemplateHandler) GetAllTemplates(c *gin.Context) {
 	log.Println("[Templates] GetAllTemplates: Starting request")
+	limit, offset, ok := parsePagination(c, 100, 200)
+	if !ok {
+		return
+	}
 
 	var templates []models.ParkingSpotTemplate
 
@@ -30,9 +35,10 @@ func (h *TemplateHandler) GetAllTemplates(c *gin.Context) {
 		       created_at, updated_at
 		FROM parking_spot_templates
 		ORDER BY name ASC
+		LIMIT $1 OFFSET $2
 	`
 
-	err := h.db.Select(&templates, query)
+	err := h.db.SelectContext(c.Request.Context(), &templates, query, limit, offset)
 	if err != nil {
 		log.Printf("[Templates] GetAllTemplates: Database error: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch templates"})
@@ -57,7 +63,7 @@ func (h *TemplateHandler) GetAllTemplates(c *gin.Context) {
 func (h *TemplateHandler) GetTemplateByID(c *gin.Context) {
 	templateIDStr := c.Param("id")
 	templateID, err := strconv.Atoi(templateIDStr)
-	if err != nil {
+	if err != nil || templateID < 1 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid template ID"})
 		return
 	}
@@ -105,6 +111,10 @@ func (h *TemplateHandler) CreateTemplate(c *gin.Context) {
 
 	if err := c.ShouldBindJSON(&input); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if err := validateTemplateInput(input.Name, input.Description, input.Notes, input.DurationEstimate, input.Schedules); err != nil {
+		Error(c, http.StatusBadRequest, "invalid_template", err.Error())
 		return
 	}
 
@@ -191,7 +201,7 @@ func (h *TemplateHandler) CreateTemplate(c *gin.Context) {
 func (h *TemplateHandler) UpdateTemplate(c *gin.Context) {
 	templateIDStr := c.Param("id")
 	templateID, err := strconv.Atoi(templateIDStr)
-	if err != nil {
+	if err != nil || templateID < 1 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid template ID"})
 		return
 	}
@@ -207,6 +217,10 @@ func (h *TemplateHandler) UpdateTemplate(c *gin.Context) {
 
 	if err := c.ShouldBindJSON(&input); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if err := validateTemplateInput(input.Name, input.Description, input.Notes, input.DurationEstimate, input.Schedules); err != nil {
+		Error(c, http.StatusBadRequest, "invalid_template", err.Error())
 		return
 	}
 
@@ -297,7 +311,7 @@ func (h *TemplateHandler) UpdateTemplate(c *gin.Context) {
 func (h *TemplateHandler) DeleteTemplate(c *gin.Context) {
 	templateIDStr := c.Param("id")
 	templateID, err := strconv.Atoi(templateIDStr)
-	if err != nil {
+	if err != nil || templateID < 1 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid template ID"})
 		return
 	}
@@ -320,6 +334,36 @@ func (h *TemplateHandler) DeleteTemplate(c *gin.Context) {
 
 	log.Printf("[Templates] DeleteTemplate: Successfully deleted template %d", templateID)
 	c.JSON(http.StatusOK, gin.H{"message": "Template deleted successfully"})
+}
+
+func validateTemplateInput(name string, description, notes *string, duration *int, schedules []models.EnforcementSchedule) error {
+	if len([]rune(name)) < 1 || len([]rune(name)) > 255 {
+		return fmt.Errorf("name must be between 1 and 255 characters")
+	}
+	if description != nil && len([]rune(*description)) > 1000 {
+		return fmt.Errorf("description is too long")
+	}
+	if notes != nil && len([]rune(*notes)) > 1000 {
+		return fmt.Errorf("notes are too long")
+	}
+	if duration != nil && (*duration < 1 || *duration > 1440) {
+		return fmt.Errorf("duration_estimate must be between 1 and 1440")
+	}
+	if len(schedules) > 100 {
+		return fmt.Errorf("too many schedules")
+	}
+	for _, schedule := range schedules {
+		if schedule.DayOfWeek < 0 || schedule.DayOfWeek > 6 {
+			return fmt.Errorf("day_of_week must be between 0 and 6")
+		}
+		if schedule.ScheduleType != "enforced" && schedule.ScheduleType != "enforced_unpaid" && schedule.ScheduleType != "no_parking" && schedule.ScheduleType != "no_stopping" && schedule.ScheduleType != "free" && schedule.ScheduleType != "unenforced" {
+			return fmt.Errorf("invalid schedule_type")
+		}
+		if len(schedule.StartTime) > 8 || len(schedule.EndTime) > 8 {
+			return fmt.Errorf("invalid schedule time")
+		}
+	}
+	return nil
 }
 
 // Helper function to get schedules for a template

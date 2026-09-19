@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"log"
+	"math"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -22,18 +23,25 @@ func NewAdminHandler(db *sqlx.DB) *AdminHandler {
 
 // GetAllUsers returns all users (admin only)
 func (h *AdminHandler) GetAllUsers(c *gin.Context) {
+	limit, offset, ok := parsePagination(c, 100, 200)
+	if !ok {
+		return
+	}
 	var users []models.User
 
 	query := `
 		SELECT id, email, username, full_name, phone_number, avatar_url, bio,
 		       karma_points, notifications_enabled, enforcement_alerts_enabled,
-		       parking_radius_miles, email_verified, is_active, is_admin,
+		       parking_radius_miles, notification_radius_meters,
+		       ask_about_enforcement_after_parking, announce_open_spot_after_unparking,
+	       email_verified, is_active, is_admin, mfa_enabled,
 		       created_at, updated_at, last_login_at
 		FROM users
 		ORDER BY created_at DESC
+		LIMIT $1 OFFSET $2
 	`
 
-	err := h.db.Select(&users, query)
+	err := h.db.SelectContext(c.Request.Context(), &users, query, limit, offset)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch users"})
 		return
@@ -45,6 +53,10 @@ func (h *AdminHandler) GetAllUsers(c *gin.Context) {
 // GetAllParkingSpots returns all parking spots (admin only)
 func (h *AdminHandler) GetAllParkingSpots(c *gin.Context) {
 	log.Println("[Admin] GetAllParkingSpots: Starting request")
+	limit, offset, ok := parsePagination(c, 100, 200)
+	if !ok {
+		return
+	}
 
 	var spots []models.ParkingSpot
 
@@ -57,10 +69,11 @@ func (h *AdminHandler) GetAllParkingSpots(c *gin.Context) {
 		       verified_by_count, flagged_count, created_at, expires_at, taken_at
 		FROM parking_spots
 		ORDER BY created_at DESC
+		LIMIT $1 OFFSET $2
 	`
 
 	log.Println("[Admin] GetAllParkingSpots: Executing query")
-	err := h.db.Select(&spots, query)
+	err := h.db.SelectContext(c.Request.Context(), &spots, query, limit, offset)
 	if err != nil {
 		log.Printf("[Admin] GetAllParkingSpots: Database error: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch parking spots"})
@@ -157,6 +170,20 @@ func (h *AdminHandler) CreateParkingSpot(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Must provide either latitude/longitude OR all 4 corners"})
 		return
 	}
+	if hasCenter {
+		if err := validateCoordinates(*req.Latitude, *req.Longitude); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+	}
+	if req.Status != "" && req.Status != "available" && req.Status != "occupied" && req.Status != "unknown" && req.Status != "taken" && req.Status != "expired" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid parking spot status"})
+		return
+	}
+	if req.DurationEstimate != nil && (*req.DurationEstimate < 1 || *req.DurationEstimate > 1440) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "duration_estimate must be between 1 and 1440"})
+		return
+	}
 
 	log.Printf("[Admin] CreateParkingSpot: Method=%s", map[bool]string{true: "corners", false: "center"}[hasCorners])
 
@@ -226,7 +253,7 @@ func (h *AdminHandler) CreateParkingSpot(c *gin.Context) {
 
 	if err != nil {
 		log.Printf("[Admin] CreateParkingSpot: Database error: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create parking spot", "details": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create parking spot"})
 		return
 	}
 
@@ -426,9 +453,9 @@ func (h *AdminHandler) CreateGeofence(c *gin.Context) {
 
 	// Convert polygon to PostGIS format
 	// Format: POLYGON((lng1 lat1, lng2 lat2, lng3 lat3, lng1 lat1))
-	if len(req.Polygon) == 0 || len(req.Polygon[0]) < 3 {
+	if !validPolygon(req.Polygon) {
 		log.Printf("[Admin] CreateGeofence: Invalid polygon - not enough coordinates")
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Polygon must have at least 3 coordinates"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Polygon must contain closed rings with valid coordinates"})
 		return
 	}
 
@@ -454,14 +481,39 @@ func (h *AdminHandler) CreateGeofence(c *gin.Context) {
 	result, err := h.db.Exec(query, id, string(geoJSONBytes))
 	if err != nil {
 		log.Printf("[Admin] CreateGeofence: Database error: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create geofence", "details": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create geofence"})
 		return
 	}
 
 	rowsAffected, _ := result.RowsAffected()
+	if rowsAffected == 0 {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Parking spot not found"})
+		return
+	}
 	log.Printf("[Admin] CreateGeofence: Success! Rows affected: %d", rowsAffected)
 
 	c.JSON(http.StatusOK, gin.H{"message": "Geofence created successfully"})
+}
+
+func validPolygon(polygon [][][]float64) bool {
+	if len(polygon) == 0 || len(polygon) > 10 {
+		return false
+	}
+	for _, ring := range polygon {
+		if len(ring) < 4 || len(ring) > 101 {
+			return false
+		}
+		for _, point := range ring {
+			if len(point) != 2 || math.IsNaN(point[0]) || math.IsNaN(point[1]) || math.IsInf(point[0], 0) || math.IsInf(point[1], 0) || point[0] < -180 || point[0] > 180 || point[1] < -90 || point[1] > 90 {
+				return false
+			}
+		}
+		first, last := ring[0], ring[len(ring)-1]
+		if first[0] != last[0] || first[1] != last[1] {
+			return false
+		}
+	}
+	return true
 }
 
 // UpdateGeofence updates a geofence for a parking spot (admin)
@@ -497,6 +549,10 @@ func (h *AdminHandler) DeleteGeofence(c *gin.Context) {
 
 // GetAllEnforcementAlerts returns all enforcement alerts (admin only)
 func (h *AdminHandler) GetAllEnforcementAlerts(c *gin.Context) {
+	limit, offset, ok := parsePagination(c, 100, 200)
+	if !ok {
+		return
+	}
 	var alerts []models.EnforcementAlert
 
 	query := `
@@ -505,9 +561,10 @@ func (h *AdminHandler) GetAllEnforcementAlerts(c *gin.Context) {
 		       flagged_count, created_at, expires_at, resolved_at
 		FROM enforcement_alerts
 		ORDER BY created_at DESC
+		LIMIT $1 OFFSET $2
 	`
 
-	err := h.db.Select(&alerts, query)
+	err := h.db.SelectContext(c.Request.Context(), &alerts, query, limit, offset)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch enforcement alerts"})
 		return

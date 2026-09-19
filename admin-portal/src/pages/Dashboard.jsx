@@ -29,8 +29,8 @@ export default function Dashboard() {
         activeAlerts: alertsRes.data?.filter(a => a.is_active)?.length || 0,
         totalReports: spotsRes.data?.reduce((sum, spot) => sum + (spot.report_count || 0), 0) || 0,
       });
-    } catch (error) {
-      console.error('Failed to load stats:', error);
+    } catch {
+      setStats((current) => current);
     } finally {
       setLoading(false);
     }

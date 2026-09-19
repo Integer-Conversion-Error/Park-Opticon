@@ -35,12 +35,12 @@ func Setup(cfg *config.Config) *gin.Engine {
 		{
 			// Profile
 			protected.GET("/profile", h.GetProfile)
+			protected.GET("/profile/community-impact", h.GetCommunityImpact)
 
 			// Parking spots
 			spots := protected.Group("/parking-spots")
 			{
 				spots.GET("/nearby", h.GetNearbyParkingSpots)
-				spots.POST("", h.ReportParkingSpot)
 				spots.PATCH("/:id/taken", h.MarkSpotTaken)
 			}
 
@@ -73,7 +73,7 @@ func Setup(cfg *config.Config) *gin.Engine {
 				admin.POST("/parking-spots", h.CreateParkingSpot)
 				admin.PUT("/parking-spots/:id", h.UpdateParkingSpot)
 				admin.DELETE("/parking-spots/:id", h.DeleteParkingSpot)
-				
+
 				// Geofencing
 				admin.POST("/parking-spots/:id/geofence", h.CreateGeofence)
 				admin.PUT("/parking-spots/:id/geofence", h.UpdateGeofence)

@@ -1,0 +1,10 @@
+[Unit]
+Description=Daily Park Opticon local database backup
+
+[Timer]
+OnCalendar=*-*-* 02:30:00 UTC
+Persistent=true
+Unit=parkopticon-local-backup.service
+
+[Install]
+WantedBy=timers.target

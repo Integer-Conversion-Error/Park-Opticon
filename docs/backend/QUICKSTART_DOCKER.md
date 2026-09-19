@@ -1,154 +1,66 @@
-# 🚀 Quick Start Guide - Docker Development Server
+# Docker quick start
 
-**Get your backend running in 5 minutes!**
+This is the maintained Docker development guide for the Go/PostGIS backend.
 
----
+## Prerequisites
 
-## Step 1: Install Docker Desktop (If Not Already)
+- Docker Engine with Compose v2
+- A `backend/.env` file with `DB_PASSWORD` set
 
-**Windows:** [Download Docker Desktop](https://www.docker.com/products/docker-desktop/)
-
-After installation, start Docker Desktop.
-
----
-
-## Step 2: Start the Backend
-
-Open PowerShell in the backend directory:
-
-```powershell
+```sh
 cd backend
-
-# Start everything (backend + database)
-docker-compose up -d
-
-# View logs
-docker-compose logs -f backend
+cp .env.example .env
+# Edit DB_PASSWORD and any optional Expo credentials.
+docker compose up --build
 ```
 
-Wait for:
+## Services
+
+| Service | Purpose | Host exposure |
+| --- | --- | --- |
+| `postgres` | PostgreSQL 15 + PostGIS | `localhost:5432` in development |
+| `backend` | Go/Gin HTTP API | `http://localhost:8080` |
+| `alert-worker` | Durable alert matching, push delivery, expiry work | none |
+
+The API and worker both run migrations safely at startup. The worker is a
+separate service by design; do not add alert processing back into API replicas.
+
+## Useful commands
+
+```sh
+# Run in the foreground
+docker compose up --build
+
+# Run in the background
+docker compose up --build -d
+
+# Inspect status and logs
+docker compose ps
+docker compose logs -f backend
+docker compose logs -f alert-worker
+
+# Stop the stack while preserving the database volume
+docker compose down
 ```
-✅ Database connected successfully
-✅ Database migrations completed
-🚀 Server starting on :8080
-```
 
----
+`docker compose down -v` deletes the local development database volume. Use it
+only when a clean database is intended.
 
-## Step 3: Test It Works
+## Validate the stack
 
-```powershell
-# Health check
+```sh
 curl http://localhost:8080/health
-
-# Should return: {"status":"healthy"}
+cd backend && go test ./...
 ```
 
----
+For a real parked-car alert test, use an Expo-enabled device, set
+`EXPO_PUSH_ACCESS_TOKEN`, start a parking session, and submit a nearby
+enforcement report from another account. See [API testing](API_TESTING.md).
 
-## Step 4: Find Your Local IP
+## Production note
 
-```powershell
-ipconfig | Select-String "IPv4"
-```
-
-Example output: `192.168.1.100`
-
----
-
-## Step 5: Access from Other Devices
-
-**From your desktop or phone (on same WiFi):**
-```
-http://192.168.1.100:8080
-```
-
-**Update React Native app:**
-```javascript
-// parkopticon/src/services/api.js
-const API_BASE_URL = 'http://192.168.1.100:8080/api/v1';
-```
-
----
-
-## 🎯 That's It!
-
-Your backend is now:
-- ✅ Running in Docker
-- ✅ Accessible from your network
-- ✅ Auto-restarts on failure
-- ✅ Data persists in Docker volumes
-
----
-
-## 📱 Next Steps
-
-### Test with React Native App
-
-```powershell
-# In parkopticon directory
-cd ..\parkopticon
-
-# Update the API URL in your code
-# Then start Expo
-npx expo start
-```
-
-### Stop the Backend
-
-```powershell
-docker-compose down
-```
-
-### Restart the Backend
-
-```powershell
-docker-compose up -d
-```
-
-### View Logs
-
-```powershell
-docker-compose logs -f backend
-```
-
----
-
-## 🏠 Move to Ubuntu Server Later
-
-When you have access to your Ubuntu PC:
-
-1. **Copy the entire backend folder** to Ubuntu
-2. **Run:** `docker-compose -f docker-compose.prod.yml up -d`
-3. **Access from anywhere** using Tailscale (see DOCKER_DEPLOYMENT.md)
-
----
-
-## 🆘 Troubleshooting
-
-**Can't connect?**
-- Check Docker Desktop is running
-- Check Windows Firewall isn't blocking port 8080
-- Try: `docker-compose restart`
-
-**Database errors?**
-- Wait 10 seconds for PostgreSQL to start
-- Check logs: `docker-compose logs postgres`
-
-**Need to reset everything?**
-```powershell
-docker-compose down -v  # Removes data!
-docker-compose up -d
-```
-
----
-
-## 🔗 Useful Links
-
-- Full deployment guide: `DOCKER_DEPLOYMENT.md`
-- API testing: `API_TESTING.md`
-- Backend docs: `README.md`
-
----
-
-**Questions? Check the docs or ask! 🚀**
+`docker-compose.prod.yml` is a container definition, not a complete public
+production deployment. It does not include TLS termination, external
+monitoring, or a real-device push-release verification. For the encrypted
+off-host backup and restore-drill workflow, see [self-hosting](SELF_HOSTING.md)
+and [deployment requirements](DOCKER_DEPLOYMENT.md).

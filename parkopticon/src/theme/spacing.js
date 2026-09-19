@@ -1,61 +1,34 @@
-/**
- * Spacing system for Parkopticon
- * Based on 8pt grid system
- */
-
+/** Compact spacing and elevation tokens for the mobile product shell. */
 export const spacing = {
-  xs: 4,    // Extra small
-  sm: 8,    // Small
-  md: 16,   // Medium (base unit)
-  lg: 24,   // Large
-  xl: 32,   // Extra large
-  xxl: 48,  // Extra extra large
+  xs: 4,
+  sm: 8,
+  md: 16,
+  lg: 20,
+  xl: 28,
+  xxl: 40,
 };
 
-/**
- * Border radius values
- */
 export const borderRadius = {
   none: 0,
-  sm: 4,
-  md: 8,
+  sm: 8,
+  md: 12,
   lg: 16,
-  xl: 24,
-  full: 9999,  // For circular elements
+  xl: 20,
+  full: 9999,
 };
 
-/**
- * Shadow elevations
- * Use these for cards and elevated elements
- */
 export const shadows = {
   none: {
-    shadowColor: 'transparent',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0,
-    shadowRadius: 0,
-    elevation: 0,
+    shadowColor: 'transparent', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0, shadowRadius: 0, elevation: 0,
   },
   small: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.18,
-    shadowRadius: 1,
-    elevation: 1,
+    shadowColor: '#102A36', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 3, elevation: 1,
   },
   medium: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowColor: '#102A36', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.09, shadowRadius: 6, elevation: 2,
   },
   large: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    elevation: 5,
+    shadowColor: '#102A36', shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.14, shadowRadius: 12, elevation: 4,
   },
 };
 

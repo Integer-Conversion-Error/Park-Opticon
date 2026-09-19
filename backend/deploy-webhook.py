@@ -14,7 +14,9 @@ import os
 # Configuration
 PORT = 9000
 DEPLOY_SCRIPT = "/opt/parkopticon/deploy.sh"
-SECRET = os.getenv("WEBHOOK_SECRET", "change_this_secret")  # Set in environment
+SECRET = os.getenv("WEBHOOK_SECRET")
+if not SECRET:
+    raise RuntimeError("WEBHOOK_SECRET must be configured")
 
 
 class WebhookHandler(BaseHTTPRequestHandler):
@@ -91,7 +93,7 @@ def run_server():
     server = HTTPServer(('0.0.0.0', PORT), WebhookHandler)
     print(f"🎯 Webhook server listening on port {PORT}")
     print(f"📍 Endpoint: http://<your-ip>:{PORT}/deploy")
-    print(f"🔐 Secret: {'Set' if SECRET != 'change_this_secret' else 'NOT SET - Please set WEBHOOK_SECRET env var'}")
+    print("🔐 Webhook secret: configured")
     print("")
     server.serve_forever()
 

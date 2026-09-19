@@ -12,8 +12,8 @@ echo ""
 # Database connection parameters
 DB_HOST="${DB_HOST:-localhost}"
 DB_PORT="${DB_PORT:-5432}"
-DB_USER="${DB_USER:-postgres}"
-DB_NAME="parkopticon"
+DB_USER="${DB_USER:-parkopticon}"
+DB_NAME="${DB_NAME:-parkopticon_db}"
 DB_PASSWORD="${DB_PASSWORD:-}"
 
 # Colors for output
@@ -25,18 +25,18 @@ NC='\033[0m' # No Color
 # Function to run SQL command
 run_sql() {
     if [ -z "$DB_PASSWORD" ]; then
-        psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d postgres -c "$1" 2>&1
+        psql -v ON_ERROR_STOP=1 -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d postgres -c "$1" 2>&1
     else
-        PGPASSWORD="$DB_PASSWORD" psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d postgres -c "$1" 2>&1
+        PGPASSWORD="$DB_PASSWORD" psql -v ON_ERROR_STOP=1 -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d postgres -c "$1" 2>&1
     fi
 }
 
 # Function to run SQL file
 run_sql_file() {
     if [ -z "$DB_PASSWORD" ]; then
-        psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -f "$1" 2>&1
+        psql -v ON_ERROR_STOP=1 -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -f "$1" 2>&1
     else
-        PGPASSWORD="$DB_PASSWORD" psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -f "$1" 2>&1
+        PGPASSWORD="$DB_PASSWORD" psql -v ON_ERROR_STOP=1 -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -f "$1" 2>&1
     fi
 }
 
@@ -119,11 +119,7 @@ ADMIN_COUNT=$(run_sql_file <(echo "SELECT COUNT(*) FROM users WHERE is_admin = t
 echo "   Admin users: $ADMIN_COUNT"
 
 echo ""
-echo "🔑 Default Admin Credentials:"
-echo "   Email: admin@parkopticon.com"
-echo "   Password: admin123"
-echo ""
-echo "⚠️  Remember to change the admin password in production!"
+echo "🔐 No default admin account is created. Run setup-admin.sh with ADMIN_EMAIL and ADMIN_PASSWORD, then enroll MFA."
 echo ""
 echo "✅ You can now start the backend server:"
 echo "   cd backend && ./start.sh"

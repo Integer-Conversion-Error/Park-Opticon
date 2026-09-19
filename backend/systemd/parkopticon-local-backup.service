@@ -1,0 +1,14 @@
+[Unit]
+Description=Park Opticon local database backup
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+User=root
+UMask=0077
+ExecStart=/usr/local/libexec/parkopticon/backup-local-db.sh
+TimeoutStartSec=30min
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7

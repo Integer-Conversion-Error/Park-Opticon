@@ -14,8 +14,8 @@ export default function Login({ onLogin }) {
 
     try {
       const response = await apiLogin(email, password);
-      const { access_token } = response.data;
-      onLogin(access_token);
+      const { access_token, user } = response.data;
+      onLogin(access_token, user);
     } catch (err) {
       setError(err.response?.data?.error || 'Invalid credentials');
     } finally {
@@ -77,10 +77,6 @@ export default function Login({ onLogin }) {
           </button>
         </form>
 
-        <div className="mt-6 text-center text-sm text-gray-600">
-          <p>Admin credentials:</p>
-          <p className="font-mono text-xs mt-1">admin@parkopticon.com / admin123</p>
-        </div>
       </div>
     </div>
   );

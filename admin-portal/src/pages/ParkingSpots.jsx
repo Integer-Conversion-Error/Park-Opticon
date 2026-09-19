@@ -27,21 +27,10 @@ export default function ParkingSpots() {
   }, []);
 
   const loadSpots = async () => {
-    console.log('[ParkingSpots] Loading parking spots...');
     try {
       const response = await getParkingSpots();
-      console.log('[ParkingSpots] API Response:', response);
-      console.log('[ParkingSpots] Response data:', response.data);
-      console.log('[ParkingSpots] Data type:', typeof response.data, 'Is array:', Array.isArray(response.data));
       setSpots(response.data || []);
-      console.log('[ParkingSpots] Spots set successfully, count:', (response.data || []).length);
-    } catch (error) {
-      console.error('[ParkingSpots] Failed to load parking spots:', error);
-      console.error('[ParkingSpots] Error details:', {
-        message: error.message,
-        response: error.response?.data,
-        status: error.response?.status
-      });
+    } catch {
       setMessage({ type: 'error', text: 'Failed to load parking spots' });
       setSpots([]);
     } finally {
@@ -95,9 +84,6 @@ export default function ParkingSpots() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    console.log('[ParkingSpots] Form submitted');
-    console.log('[ParkingSpots] Form data (raw):', formData);
-    
     try {
       // Submit with center point only
       const data = {
@@ -111,27 +97,17 @@ export default function ParkingSpots() {
         status: formData.status,
       };
       
-      console.log('[ParkingSpots] Prepared data for API:', data);
-
       if (editingSpot) {
-        console.log('[ParkingSpots] Updating spot:', editingSpot.id);
-        const response = await updateParkingSpot(editingSpot.id, data);
-        console.log('[ParkingSpots] Update response:', response);
+        await updateParkingSpot(editingSpot.id, data);
         setMessage({ type: 'success', text: 'Parking spot updated successfully' });
       } else {
-        console.log('[ParkingSpots] Creating new spot...');
-        const response = await createParkingSpot(data);
-        console.log('[ParkingSpots] Create response:', response);
+        await createParkingSpot(data);
         setMessage({ type: 'success', text: 'Parking spot created successfully' });
       }
 
       setShowModal(false);
-      console.log('[ParkingSpots] Reloading spots after save...');
       await loadSpots();
     } catch (error) {
-      console.error('[ParkingSpots] Submit error:', error);
-      console.error('[ParkingSpots] Error response:', error.response);
-      console.error('[ParkingSpots] Error data:', error.response?.data);
       setMessage({ type: 'error', text: error.response?.data?.error || 'Failed to save parking spot' });
     }
   };
@@ -142,9 +118,6 @@ export default function ParkingSpots() {
       return;
     }
 
-    console.log('[ParkingSpots] Creating geofence for spot:', selectedSpotForGeofence);
-    console.log('[ParkingSpots] Geofence coordinates:', coordinates);
-
     try {
       // Call API with properly formatted polygon
       await createGeofence(selectedSpotForGeofence, coordinates);
@@ -152,7 +125,6 @@ export default function ParkingSpots() {
       setSelectedSpotForGeofence(null);
       await loadSpots();
     } catch (error) {
-      console.error('[ParkingSpots] Geofence error:', error);
       setMessage({ type: 'error', text: error.response?.data?.error || 'Failed to create geofence' });
     }
   };

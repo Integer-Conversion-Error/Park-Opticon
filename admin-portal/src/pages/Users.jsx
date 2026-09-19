@@ -14,8 +14,8 @@ export default function Users() {
     try {
       const response = await getUsers();
       setUsers(response.data);
-    } catch (error) {
-      console.error('Failed to load users:', error);
+    } catch {
+      setUsers([]);
     } finally {
       setLoading(false);
     }

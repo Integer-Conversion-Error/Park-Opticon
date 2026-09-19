@@ -2,31 +2,38 @@
 
 # Database setup script for Park-Opticon
 
+set -euo pipefail
+
+: "${ADMIN_EMAIL:?Set ADMIN_EMAIL before running this script}"
+: "${ADMIN_PASSWORD:?Set ADMIN_PASSWORD before running this script}"
+DB_NAME="${DB_NAME:-parkopticon_db}"
+ADMIN_USERNAME="${ADMIN_USERNAME:-admin}"
+ADMIN_HASH="$(go run ./cmd/hashpw "$ADMIN_PASSWORD")"
+
 echo "Creating database and admin user..."
 
 # Create database
 sudo -u postgres psql <<EOF
 -- Create database if it doesn't exist
-SELECT 'CREATE DATABASE parkopticon'
-WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'parkopticon')\gexec
+SELECT 'CREATE DATABASE $DB_NAME'
+WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = '$DB_NAME')\gexec
 
 -- Connect to parkopticon database
-\c parkopticon
+\c $DB_NAME
 
 -- Enable PostGIS extension
 CREATE EXTENSION IF NOT EXISTS postgis;
 
--- Create admin user (password: admin123)
 INSERT INTO users (
     id, email, username, password_hash, full_name,
     karma_points, notifications_enabled, enforcement_alerts_enabled,
-    parking_radius_miles, email_verified, is_active, is_admin
+    parking_radius_miles, email_verified, is_active, is_admin, mfa_enabled
 )
 VALUES (
     gen_random_uuid(),
-    'admin@parkopticon.com',
-    'admin',
-    '\$2a\$10\$rLZvzl4xH7e6R8PjZKfVY.xQH9KN6KqZZ5nH5V8YhWvJ6Z7nQ8zQG', -- bcrypt hash of "admin123"
+    '$ADMIN_EMAIL',
+    '$ADMIN_USERNAME',
+    '$ADMIN_HASH',
     'Admin User',
     0,
     true,
@@ -34,19 +41,17 @@ VALUES (
     5.0,
     true,
     true,
-    true
+    true,
+    true,
+    false
 )
 ON CONFLICT (email) DO UPDATE SET is_admin = true;
 
 -- Show admin user
-SELECT email, username, is_admin FROM users WHERE email = 'admin@parkopticon.com';
+SELECT email, username, is_admin FROM users WHERE email = '$ADMIN_EMAIL';
 
 EOF
 
 echo ""
 echo "✅ Database setup complete!"
-echo ""
-echo "Admin credentials:"
-echo "  Email: admin@parkopticon.com"
-echo "  Password: admin123"
-echo ""
+echo "Admin account created. MFA enrollment is required at first admin login."

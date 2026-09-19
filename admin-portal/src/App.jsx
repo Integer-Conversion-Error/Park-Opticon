@@ -9,31 +9,39 @@ import MapManager from './pages/MapManager';
 import Templates from './pages/Templates';
 import Analytics from './pages/Analytics';
 import './index.css';
+import { clearAccessToken, setAccessToken } from './api/client';
+import AdminMFA from './components/AdminMFA';
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [adminMFA, setAdminMFA] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     // Check if user is authenticated
-    const token = localStorage.getItem('admin_token');
-    console.log('App mounted. Token:', token ? 'exists' : 'none', 'Auth:', !!token);
-    setIsAuthenticated(!!token);
+    const handleExpired = () => setIsAuthenticated(false);
+    window.addEventListener('parkopticon:auth-expired', handleExpired);
     setLoading(false);
+    return () => window.removeEventListener('parkopticon:auth-expired', handleExpired);
   }, []);
 
-  const handleLogin = (token) => {
-    localStorage.setItem('admin_token', token);
-    setIsAuthenticated(true);
+  const handleLogin = (token, user) => {
+    setAccessToken(token);
+    if (user?.is_admin) {
+      setAdminMFA(user.mfa_enabled ? 'verify' : 'enroll');
+      setIsAuthenticated(false);
+    } else {
+      setIsAuthenticated(true);
+    }
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('admin_token');
+    clearAccessToken();
+    setAdminMFA(null);
     setIsAuthenticated(false);
   };
 
   if (loading) {
-    console.log('App: showing loading state');
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-xl text-gray-600">Loading...</div>
@@ -41,7 +49,9 @@ function App() {
     );
   }
 
-  console.log('App: rendering routes. isAuthenticated:', isAuthenticated);
+  if (adminMFA) {
+    return <AdminMFA mode={adminMFA} onComplete={() => { setAdminMFA(null); setIsAuthenticated(true); }} onLogout={handleLogout} />;
+  }
 
   return (
     <BrowserRouter>

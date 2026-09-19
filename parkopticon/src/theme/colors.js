@@ -1,64 +1,50 @@
 /**
- * Color palette for Parkopticon
- * Export these colors from your Figma design
+ * Parkopticon visual system.
+ * A quiet slate canvas, deep ink typography, and a teal action color keep
+ * the product legible and operational instead of decorative.
  */
-
 export const colors = {
-  // Primary brand colors
-  primary: '#2196F3',      // Blue - Main brand color
-  primaryLight: '#64B5F6',
-  primaryDark: '#1976D2',
-  
-  // Secondary colors
-  secondary: '#FF9800',    // Orange - Accent color
-  secondaryLight: '#FFB74D',
-  secondaryDark: '#F57C00',
-  
-  // Status colors
-  success: '#4CAF50',      // Green - Available parking
-  error: '#F44336',        // Red - Enforcement/alerts
-  warning: '#FFC107',      // Yellow - Warnings
-  info: '#2196F3',         // Blue - Info messages
-  
-  // Neutral colors
-  background: '#FFFFFF',
-  surface: '#F5F5F5',
-  surfaceDark: '#E0E0E0',
-  
-  // Text colors
-  text: {
-    primary: '#212121',
-    secondary: '#757575',
-    disabled: '#BDBDBD',
-    inverse: '#FFFFFF',
-  },
-  
-  // Flat text colors for backward compatibility
-  text: '#212121',
-  textSecondary: '#757575',
-  textDisabled: '#BDBDBD',
+  primary: '#0B7285',
+  primaryLight: '#DDF3F4',
+  primaryDark: '#075766',
+  secondary: '#D49426',
+  secondaryLight: '#FFF2D8',
+  secondaryDark: '#9A6412',
+
+  success: '#2D8158',
+  successLight: '#E5F4EC',
+  error: '#B94A4A',
+  errorLight: '#FBE9E8',
+  warning: '#B7791F',
+  warningLight: '#FFF4D9',
+  info: '#2D6CDF',
+
+  background: '#F4F7F8',
+  surface: '#FFFFFF',
+  surfaceSubtle: '#EDF2F4',
+  surfaceDark: '#DDE7EA',
+
+  text: '#12232D',
+  textSecondary: '#5B6D77',
+  textMuted: '#8797A1',
+  textDisabled: '#AAB7BD',
   textInverse: '#FFFFFF',
-  
-  // Also add white for background usage
   white: '#FFFFFF',
-  
-  // Border colors
+
   border: {
-    light: '#E0E0E0',
-    medium: '#BDBDBD',
-    dark: '#9E9E9E',
+    light: '#E1E9EC',
+    medium: '#C5D3D8',
+    dark: '#91A5AD',
   },
-  
-  // Map marker colors
+
   marker: {
-    parking: '#4CAF50',     // Green for available parking
-    enforcement: '#F44336',  // Red for enforcement
-    ticket: '#FF9800',      // Orange for ticket locations
-    user: '#2196F3',        // Blue for user location
+    parking: '#2D8158',
+    enforcement: '#B94A4A',
+    ticket: '#D49426',
+    user: '#0B7285',
   },
-  
-  // Shadow color
-  shadow: '#000000',
+
+  shadow: '#102A36',
 };
 
 export default colors;

@@ -3,6 +3,7 @@
 
 -- Enable PostGIS extension for geospatial support
 CREATE EXTENSION IF NOT EXISTS postgis;
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- ============================================================================
@@ -14,7 +15,7 @@ CREATE TABLE users (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     email VARCHAR(255) UNIQUE NOT NULL,
     username VARCHAR(100) UNIQUE NOT NULL,
-    password_hash VARCHAR(255) NOT NULL,
+    password_hash VARCHAR(255),
     
     -- Profile information
     full_name VARCHAR(255),
@@ -98,7 +99,7 @@ CREATE TABLE parking_spots (
     longitude DECIMAL(11, 8) NOT NULL,
     
     -- Geofence for individual parking spaces (MultiPolygon to support multiple spaces)
-    geofence GEOGRAPHY(MULTIPOLYGON, 4326),
+    geofence GEOMETRY(POLYGON, 4326),
     
     -- Address information
     address TEXT,
@@ -178,9 +179,7 @@ CREATE TABLE enforcement_alerts (
     street_name VARCHAR(255),
     
     -- Alert details
-    enforcement_type VARCHAR(50) CHECK (enforcement_type IN (
-        'meter_maid', 'tow_truck', 'police', 'parking_officer', 'other'
-    )) NOT NULL,
+    enforcement_type VARCHAR(50) CHECK (enforcement_type IN ('chalking', 'ticketing')) NOT NULL,
     description TEXT NOT NULL,
     severity VARCHAR(20) DEFAULT 'medium' CHECK (severity IN ('low', 'medium', 'high')) NOT NULL,
     
@@ -551,32 +550,6 @@ LEFT JOIN enforcement_alerts ea ON ea.reporter_id = u.id
 LEFT JOIN verifications v ON v.user_id = u.id
 LEFT JOIN tickets t ON t.user_id = u.id
 GROUP BY u.id;
-
--- ============================================================================
--- INITIAL DATA (ADMIN USER)
--- ============================================================================
-
--- Insert default admin user
--- Password: admin123 (hashed with bcrypt cost 10)
-INSERT INTO users (
-    email, 
-    username, 
-    password_hash, 
-    full_name, 
-    is_admin, 
-    is_active, 
-    email_verified,
-    karma_points
-) VALUES (
-    'admin@parkopticon.com',
-    'admin',
-    '$2a$10$rQ8YvF8f6hKV4KxLN6YZ3O7L9XvZH5r3kYXJ2PZmGqV8VqF4YqKma', -- admin123
-    'System Administrator',
-    true,
-    true,
-    true,
-    1000
-);
 
 -- ============================================================================
 -- COMMENTS & DOCUMENTATION

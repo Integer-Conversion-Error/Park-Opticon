@@ -59,6 +59,9 @@ temp/
 *.sqlite
 *.sqlite3
 postgres-data/
+*.dump
+*.dump.age
+*.dump.age.sha256
 
 # Secrets & Credentials
 *.pem

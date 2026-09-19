@@ -89,8 +89,8 @@ export default function Geofencing() {
     try {
       const response = await getParkingSpots();
       setSpots(response.data);
-    } catch (error) {
-      console.error('Failed to load parking spots:', error);
+    } catch {
+      setSpots([]);
     } finally {
       setLoading(false);
     }

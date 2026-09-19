@@ -47,8 +47,7 @@ export default function Templates() {
     try {
       const response = await getTemplates();
       setTemplates(response.data || []);
-    } catch (error) {
-      console.error('Failed to load templates:', error);
+    } catch {
       setMessage({ type: 'error', text: 'Failed to load templates' });
       setTemplates([]);
     } finally {
@@ -104,7 +103,11 @@ export default function Templates() {
         spot_type: formData.spot_type || null,
         duration_estimate: formData.duration_estimate ? parseInt(formData.duration_estimate) : null,
         notes: formData.notes || null,
-        schedules: formData.schedules.map(({ all_day, ...schedule }) => schedule), // Remove all_day field
+        schedules: formData.schedules.map((entry) => {
+          const schedule = { ...entry };
+          delete schedule.all_day;
+          return schedule;
+        }),
       };
 
       if (editingTemplate) {
@@ -118,7 +121,6 @@ export default function Templates() {
       setShowModal(false);
       await loadTemplates();
     } catch (error) {
-      console.error('Submit error:', error);
       setMessage({ type: 'error', text: error.response?.data?.error || 'Failed to save template' });
     }
   };
@@ -172,11 +174,6 @@ export default function Templates() {
   // Get background color for grid cells (lighter version for visualization)
   const getScheduleTypeBgColor = (type) => {
     return SCHEDULE_TYPES.find(t => t.value === type)?.bgColor || 'bg-gray-100';
-  };
-
-  // Get border color for legend
-  const getScheduleTypeBorderColor = (type) => {
-    return SCHEDULE_TYPES.find(t => t.value === type)?.borderColor || 'border-gray-300';
   };
 
   // Function to get schedule type for a specific day and time

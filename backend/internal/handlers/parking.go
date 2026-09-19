@@ -2,6 +2,8 @@ package handlers
 
 import (
 	"database/sql"
+	"fmt"
+	"math"
 	"net/http"
 	"strconv"
 	"time"
@@ -20,67 +22,31 @@ func NewParkingHandler(db *sqlx.DB) *ParkingHandler {
 	return &ParkingHandler{db: db}
 }
 
-type CreateParkingSpotRequest struct {
-	Latitude         float64 `json:"latitude" binding:"required"`
-	Longitude        float64 `json:"longitude" binding:"required"`
-	Address          *string `json:"address"`
-	StreetName       *string `json:"street_name"`
-	SpotType         *string `json:"spot_type"`
-	DurationEstimate *int    `json:"duration_estimate"`
-	Notes            *string `json:"notes"`
-}
-
-// CreateParkingSpot creates a new parking spot report
-func (h *ParkingHandler) CreateParkingSpot(c *gin.Context) {
-	userID := c.MustGet("user_id").(uuid.UUID)
-
-	var req CreateParkingSpotRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	// Calculate expiry time
-	expiryMinutes := 120 // Default 2 hours
-	if req.DurationEstimate != nil && *req.DurationEstimate > 0 && *req.DurationEstimate < 120 {
-		expiryMinutes = *req.DurationEstimate
-	}
-	expiresAt := time.Now().Add(time.Duration(expiryMinutes) * time.Minute)
-
-	// Insert parking spot
-	spot := &models.ParkingSpot{}
-	query := `
-		INSERT INTO parking_spots (
-			reporter_id, location, latitude, longitude, address, street_name,
-			spot_type, duration_estimate, notes, expires_at
-		)
-		VALUES (
-			$1, ST_SetSRID(ST_MakePoint($2, $3), 4326), $3, $4, $5, $6, $7, $8, $9, $10
-		)
-		RETURNING id, reporter_id, latitude, longitude, address, street_name,
-		          spot_type, duration_estimate, notes, status, verified_by_count,
-		          flagged_count, created_at, expires_at
-	`
-	err := h.db.QueryRowx(
-		query, userID, req.Longitude, req.Latitude, req.Latitude, req.Longitude,
-		req.Address, req.StreetName, req.SpotType, req.DurationEstimate, req.Notes, expiresAt,
-	).StructScan(spot)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create parking spot"})
-		return
-	}
-
-	// Award karma points to reporter
-	_, _ = h.db.Exec("UPDATE users SET karma_points = karma_points + 5 WHERE id = $1", userID)
-
-	c.JSON(http.StatusCreated, spot)
+type MarkParkingSpotTakenRequest struct {
+	Latitude  *float64 `json:"latitude"`
+	Longitude *float64 `json:"longitude"`
 }
 
 // GetNearbyParkingSpots returns parking spots near a location
 func (h *ParkingHandler) GetNearbyParkingSpots(c *gin.Context) {
 	latStr := c.Query("latitude")
 	lonStr := c.Query("longitude")
-	radiusStr := c.DefaultQuery("radius_miles", "1.0")
+	radiusMeters := 1000.0
+	if raw := c.Query("radius_meters"); raw != "" {
+		parsed, parseErr := strconv.ParseFloat(raw, 64)
+		if parseErr != nil || parsed <= 0 || parsed > 2500 {
+			Error(c, http.StatusBadRequest, "invalid_radius", "radius_meters must be between 1 and 2500")
+			return
+		}
+		radiusMeters = parsed
+	} else if raw := c.Query("radius_miles"); raw != "" {
+		parsed, parseErr := strconv.ParseFloat(raw, 64)
+		if parseErr != nil || parsed <= 0 || parsed*1609.34 > 2500 {
+			Error(c, http.StatusBadRequest, "invalid_radius", "radius must not exceed 2500 metres")
+			return
+		}
+		radiusMeters = parsed * 1609.34
+	}
 
 	lat, err := strconv.ParseFloat(latStr, 64)
 	if err != nil {
@@ -93,24 +59,24 @@ func (h *ParkingHandler) GetNearbyParkingSpots(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid longitude"})
 		return
 	}
-
-	radius, err := strconv.ParseFloat(radiusStr, 64)
-	if err != nil || radius <= 0 || radius > 10 {
-		radius = 1.0
+	if err := validateCoordinates(lat, lon); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
 	}
-
-	// Convert miles to meters
-	radiusMeters := radius * 1609.34
 
 	query := `
 		SELECT 
-			id, reporter_id, latitude, longitude, address, street_name,
-			spot_type, duration_estimate, notes, status, verified_by_count,
-			flagged_count, created_at, expires_at, taken_at,
+			id, NULL::uuid AS reporter_id,
+			ROUND(latitude::numeric, 4)::double precision AS latitude,
+			ROUND(longitude::numeric, 4)::double precision AS longitude,
+			address, street_name,
+			spot_type, duration_estimate, notes, status, report_source, verified_by_count,
+			flagged_count, created_at, expires_at, stale_at, taken_at,
 			ST_Distance(location, ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography) / 1609.34 AS distance_miles
 		FROM parking_spots
 		WHERE 
 			status = 'available'
+			AND (expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP)
 			AND ST_DWithin(
 				location, 
 				ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography,
@@ -121,7 +87,7 @@ func (h *ParkingHandler) GetNearbyParkingSpots(c *gin.Context) {
 	`
 
 	spots := []models.ParkingSpot{}
-	err = h.db.Select(&spots, query, lon, lat, radiusMeters)
+	err = h.db.SelectContext(c.Request.Context(), &spots, query, lon, lat, radiusMeters)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch parking spots"})
 		return
@@ -142,16 +108,31 @@ func (h *ParkingHandler) MarkSpotTaken(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid spot ID"})
 		return
 	}
+	var req MarkParkingSpotTakenRequest
+	if err := c.ShouldBindJSON(&req); err != nil || req.Latitude == nil || req.Longitude == nil {
+		Error(c, http.StatusBadRequest, "location_required", "Current latitude and longitude are required")
+		return
+	}
+	if err := validateCoordinates(*req.Latitude, *req.Longitude); err != nil {
+		Error(c, http.StatusBadRequest, "invalid_location", err.Error())
+		return
+	}
 
 	query := `
 		UPDATE parking_spots
 		SET status = 'taken', taken_at = $1
 		WHERE id = $2 AND status = 'available'
+		  AND (expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP)
+		  AND ST_DWithin(
+			location,
+			ST_SetSRID(ST_MakePoint($3, $4), 4326)::geography,
+			300
+		)
 		RETURNING id
 	`
 
 	var returnedID uuid.UUID
-	err = h.db.Get(&returnedID, query, time.Now(), id)
+	err = h.db.GetContext(c.Request.Context(), &returnedID, query, time.Now().UTC(), id, *req.Longitude, *req.Latitude)
 	if err == sql.ErrNoRows {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Spot not found or already taken"})
 		return
@@ -162,4 +143,14 @@ func (h *ParkingHandler) MarkSpotTaken(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Spot marked as taken"})
+}
+
+func validateCoordinates(latitude, longitude float64) error {
+	if math.IsNaN(latitude) || math.IsInf(latitude, 0) || latitude < -90 || latitude > 90 {
+		return fmt.Errorf("latitude must be between -90 and 90")
+	}
+	if math.IsNaN(longitude) || math.IsInf(longitude, 0) || longitude < -180 || longitude > 180 {
+		return fmt.Errorf("longitude must be between -180 and 180")
+	}
+	return nil
 }

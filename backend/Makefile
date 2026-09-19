@@ -1,7 +1,7 @@
 # Park-Opticon Backend - Makefile for Windows PowerShell
 # Run commands with: make <target>
 
-.PHONY: help install run build test clean docker-up docker-down migrate
+.PHONY: help install run run-worker build test clean docker-up docker-down migrate
 
 # Default target
 help:
@@ -9,6 +9,7 @@ help:
 	@echo ""
 	@echo "  make install      - Download Go dependencies"
 	@echo "  make run          - Run the development server"
+	@echo "  make run-worker   - Run the alert delivery worker"
 	@echo "  make build        - Build production binary"
 	@echo "  make test         - Run tests"
 	@echo "  make clean        - Clean build artifacts"
@@ -24,6 +25,9 @@ install:
 # Run development server
 run:
 	go run cmd/server/main.go
+
+run-worker:
+	go run cmd/worker/main.go
 
 # Build production binary
 build:
