@@ -61,8 +61,8 @@ func (h *PreferencesHandler) Update(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	if req.NotificationRadiusMeters != nil && (*req.NotificationRadiusMeters < 100 || *req.NotificationRadiusMeters > 2500) {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "notification_radius_meters must be between 100 and 2500"})
+	if req.NotificationRadiusMeters != nil && (*req.NotificationRadiusMeters < 100 || *req.NotificationRadiusMeters > 1500) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "notification_radius_meters must be between 100 and 1500"})
 		return
 	}
 	if req.NotificationsEnabled == nil && req.EnforcementAlertsEnabled == nil &&

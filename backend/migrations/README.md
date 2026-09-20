@@ -39,3 +39,6 @@ mappings and one-time OAuth challenges. Provider identity is keyed only by the
 immutable OIDC subject; no provider token is stored.
 Migration `015` (runtime version 27) adds one-time reauthentication proofs for
 linking a new external identity to an existing account.
+Migration `016` (runtime version 28) reduces the maximum notification radius
+to 1,500 metres, clamps larger saved values to that limit, and retains the
+1,000-metre default. It supersedes the maximum introduced in migration `012`.

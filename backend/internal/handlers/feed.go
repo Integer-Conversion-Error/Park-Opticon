@@ -110,8 +110,8 @@ func parseFeedLocation(c *gin.Context) (float64, float64, int, error) {
 	radiusMeters := 1000
 	if raw := c.Query("radius_meters"); raw != "" {
 		radiusMeters, err = strconv.Atoi(raw)
-		if err != nil || radiusMeters < 1 || radiusMeters > 2500 {
-			return 0, 0, 0, &requestError{"radius_meters must be between 1 and 2500"}
+		if err != nil || radiusMeters < 1 || radiusMeters > 1500 {
+			return 0, 0, 0, &requestError{"radius_meters must be between 1 and 1500"}
 		}
 	}
 	return latitude, longitude, radiusMeters, nil

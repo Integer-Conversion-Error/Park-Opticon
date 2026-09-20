@@ -18,7 +18,7 @@ import (
 const (
 	alertCreatedEvent      = "enforcement_alert_created"
 	parkingSessionEvent    = "parking_session_started"
-	maxNotificationRadiusM = 2500
+	maxNotificationRadiusM = 1500
 )
 
 // PushSender keeps the queue worker independent from Expo and makes delivery

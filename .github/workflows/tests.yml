@@ -1,0 +1,50 @@
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  mobile-distance:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      # The pure geometry tests use Node's built-in runner and no native mocks.
+      - run: npm test
+        working-directory: parkopticon
+
+  backend-postgis:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgis/postgis:15-3.4
+        env:
+          POSTGRES_PASSWORD: spatial-tests
+          POSTGRES_DB: parkopticon_tests
+        ports:
+          - 5432/tcp
+        options: >-
+          --health-cmd "pg_isready -U postgres -d parkopticon_tests"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      PARKOPTICON_TEST_DATABASE_URL: postgres://postgres:spatial-tests@127.0.0.1:${{ job.services.postgres.ports[5432] }}/parkopticon_tests?sslmode=disable
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+      - run: go test -p 1 ./... -count=1
+        working-directory: backend
+      - run: go vet ./...
+        working-directory: backend

@@ -74,9 +74,13 @@ The 50 m accuracy guard remains in code to protect report quality.
 ## Product constraints to preserve
 
 - A parked location is private; users see only nearby community report data.
-- Alert radius is 100–2,500 metres; new accounts default to 1 km.
+- Alert radius is 100–1,500 metres; new accounts default to 1 km.
+- Report verification requires a known location within 300 metres, independent
+  of the notification radius. The API makes the final proximity decision.
 - Open spots created when a user unparks are approximate and short-lived.
 - Offline/guest state must not be presented as live community data.
+- Refresh map reports and notifications every 60 seconds while the map is
+  focused and the app is active, and immediately on opening or resuming it.
 
 The older UX/Figma documents are retained as historical design exploration;
 they describe deleted screens and planned workflows that are not all implemented.

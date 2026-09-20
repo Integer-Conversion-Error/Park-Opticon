@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  AppState,
   FlatList,
   Modal,
   Pressable,
@@ -32,6 +33,8 @@ import { clearPrivateSession, getPrivateSession, savePrivateSession } from '../s
 import { useAppModal } from '../components/AppModal';
 import { getFastLocation } from '../services/locationService';
 import { registerForPushNotifications } from '../services/pushNotifications';
+import { canVerifyReport, VERIFICATION_RADIUS_METERS } from '../services/geo';
+import { normalizeNotificationRadius } from '../services/notificationSettings';
 
 const FALLBACK_REGION = {
   latitude: 37.7749,
@@ -41,6 +44,7 @@ const FALLBACK_REGION = {
 };
 
 const REPORT_FOCUS_TOP_HALF_OFFSET = 0.24;
+const EVENT_REFRESH_INTERVAL_MS = 60_000;
 
 const wait = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
 
@@ -58,10 +62,9 @@ const getAddressWithTimeout = async (coords) => {
   }
 };
 
-function ReportDetailCard({ report, location, notificationRadius, onClose, onVerify, verificationMessage, now }) {
+function ReportDetailCard({ report, location, onClose, onVerify, verificationMessage, now }) {
   const meta = getReportMeta(report);
-  const reportDistance = distanceMeters(location, report);
-  const canVerify = reportDistance === null || reportDistance <= notificationRadius;
+  const canVerify = canVerifyReport(location, report);
   const isStale = getParkingSpotStatus(report, now) === 'stale';
 
   return (
@@ -115,7 +118,7 @@ function ReportDetailCard({ report, location, notificationRadius, onClose, onVer
           </View>
         </>
       ) : (
-        <Text style={styles.verifyDisabled}>Move within {notificationRadius} m to verify this report.</Text>
+        <Text style={styles.verifyDisabled}>Move within {VERIFICATION_RADIUS_METERS} m to verify this report.</Text>
       )}
       {verificationMessage ? <Text accessibilityLiveRegion="polite" style={styles.verificationMessage}>{verificationMessage}</Text> : null}
     </View>
@@ -280,42 +283,58 @@ export default function MapScreen({ navigation }) {
   useEffect(() => {
     if (!isFocused) return undefined;
     let mounted = true;
+    let refreshing = false;
 
-    Promise.all([
-      loadSettings(),
-      apiAvailable() ? api.preferences().then((remote) => ({
-        notificationsEnabled: remote.notifications_enabled,
-        notificationRadiusMeters: remote.notification_radius_meters,
-        askAboutEnforcementAfterParking: remote.ask_about_enforcement_after_parking,
-        announceOpenSpotAfterUnparking: remote.announce_open_spot_after_unparking,
-      })).catch(() => null) : Promise.resolve(null),
-      apiAvailable() && location ? api.nearby(location.latitude, location.longitude, settings.notificationRadiusMeters).then(normalizeFeed) : loadReports(),
-      getPrivateSession(),
-      apiAvailable() ? api.notifications().catch(() => null) : Promise.resolve(null),
-    ]).then(([localSettings, remoteSettings, storedReports, storedSession, notificationResponse]) => {
-      if (!mounted) return;
-      setSettings(remoteSettings || localSettings);
-      setReports(storedReports);
-      if (!sessionHydratedRef.current) {
-        const hydratedSession = storedSession || null;
-        setParkingSession(hydratedSession);
-        activeSessionRef.current = hydratedSession?.id || null;
-        sessionHydratedRef.current = true;
-      }
-      setLatestNotification(notificationResponse?.notifications?.find((item) => (item.read_at === null || item.read_at === undefined) && item.status !== 'read') || null);
-      setSyncError(apiAvailable() ? '' : (apiConfigured
-        ? 'Guest mode: live reports are unavailable.'
-        : 'Offline guest mode: live reports are unavailable.'));
-    }).catch((error) => {
-      if (mounted) {
-        setSyncError(apiConfigured ? (error.message || 'Live reports are unavailable.') : 'Offline guest mode: live reports are unavailable.');
-      }
+    const refreshEvents = () => {
+      if (!mounted || refreshing || (AppState.currentState && AppState.currentState !== 'active')) return;
+      refreshing = true;
+
+      return Promise.all([
+        loadSettings(),
+        apiAvailable() ? api.preferences().then((remote) => ({
+          notificationsEnabled: remote.notifications_enabled,
+          notificationRadiusMeters: normalizeNotificationRadius(remote.notification_radius_meters),
+          askAboutEnforcementAfterParking: remote.ask_about_enforcement_after_parking,
+          announceOpenSpotAfterUnparking: remote.announce_open_spot_after_unparking,
+        })).catch(() => null) : Promise.resolve(null),
+        apiAvailable() && location ? api.nearby(location.latitude, location.longitude, settings.notificationRadiusMeters).then(normalizeFeed) : loadReports(),
+        getPrivateSession(),
+        apiAvailable() ? api.notifications().catch(() => null) : Promise.resolve(null),
+      ]).then(([localSettings, remoteSettings, storedReports, storedSession, notificationResponse]) => {
+        if (!mounted) return;
+        setSettings(remoteSettings || localSettings);
+        setReports(storedReports);
+        if (!sessionHydratedRef.current) {
+          const hydratedSession = storedSession || null;
+          setParkingSession(hydratedSession);
+          activeSessionRef.current = hydratedSession?.id || null;
+          sessionHydratedRef.current = true;
+        }
+        setLatestNotification(notificationResponse?.notifications?.find((item) => (item.read_at === null || item.read_at === undefined) && item.status !== 'read') || null);
+        setSyncError(apiAvailable() ? '' : (apiConfigured
+          ? 'Guest mode: live reports are unavailable.'
+          : 'Offline guest mode: live reports are unavailable.'));
+      }).catch((error) => {
+        if (mounted) {
+          setSyncError(apiConfigured ? (error.message || 'Live reports are unavailable.') : 'Offline guest mode: live reports are unavailable.');
+        }
+      }).finally(() => {
+        refreshing = false;
+      });
+    };
+
+    refreshEvents();
+    const timer = setInterval(refreshEvents, EVENT_REFRESH_INTERVAL_MS);
+    const appStateSubscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') refreshEvents();
     });
 
     return () => {
       mounted = false;
+      clearInterval(timer);
+      appStateSubscription.remove();
     };
-  }, [isFocused, location]);
+  }, [isFocused, location, settings.notificationRadiusMeters]);
 
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 30000);
@@ -494,6 +513,7 @@ export default function MapScreen({ navigation }) {
   };
 
   const handleVerify = async (vote) => {
+    if (!canVerifyReport(location, selectedReport)) return;
     if (apiAvailable() && selectedReport?.id && selectedReport.id.includes('-') && location) {
       try {
         await api.verifyReport(selectedReport.type, selectedReport.id, {
@@ -643,7 +663,6 @@ export default function MapScreen({ navigation }) {
           <ReportDetailCard
             report={selectedReport}
             location={location}
-            notificationRadius={settings.notificationRadiusMeters}
             now={now}
             onClose={() => setSelectedReportId(null)}
             onVerify={handleVerify}

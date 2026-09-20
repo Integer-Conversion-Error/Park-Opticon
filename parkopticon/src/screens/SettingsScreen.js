@@ -16,10 +16,8 @@ import {
   saveSettings,
 } from '../services/localStore';
 import { api, apiAvailable } from '../services/api';
+import { NOTIFICATION_RADIUS_OPTIONS, normalizeNotificationRadius } from '../services/notificationSettings';
 
-const RADIUS_OPTIONS = [
-  100, 250, 500, 750, 1000, 1250, 1500, 1750, 2000, 2250, 2500,
-];
 const SLIDER_TRACK_INSET = 12;
 
 const formatRadius = (meters) => {
@@ -145,7 +143,7 @@ function NotchedSlider({
       </View>
       <View style={styles.radiusSliderLabels}>
         <Text style={styles.radiusSliderLabel}>{formatRadius(options[0])}</Text>
-        <Text style={styles.radiusSliderLabel}>1 km</Text>
+        <Text style={styles.radiusSliderLabel}>{formatRadius(options[Math.floor(options.length / 2)])}</Text>
         <Text style={styles.radiusSliderLabel}>
           {formatRadius(options[options.length - 1])}
         </Text>
@@ -171,7 +169,7 @@ export default function SettingsScreen() {
           remote
             ? {
                 notificationsEnabled: remote.notifications_enabled,
-                notificationRadiusMeters: remote.notification_radius_meters,
+                notificationRadiusMeters: normalizeNotificationRadius(remote.notification_radius_meters),
                 askAboutEnforcementAfterParking:
                   remote.ask_about_enforcement_after_parking,
                 announceOpenSpotAfterUnparking:
@@ -253,7 +251,7 @@ export default function SettingsScreen() {
           </Text>
         </Text>
         <NotchedSlider
-          options={RADIUS_OPTIONS}
+          options={NOTIFICATION_RADIUS_OPTIONS}
           value={settings.notificationRadiusMeters}
           onValueChange={(radius) =>
             setSettings((current) => ({

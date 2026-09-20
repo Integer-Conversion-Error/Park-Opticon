@@ -155,6 +155,7 @@ func RunMigrations(db *sqlx.DB, _ config.DatabaseConfig) error {
 		{Version: 25, Name: "add_community_impact_indexes", SQL: addCommunityImpactIndexes},
 		{Version: 26, Name: "add_oauth_identities", SQL: addOAuthIdentities},
 		{Version: 27, Name: "add_oauth_link_reauthentication", SQL: addOAuthLinkReauthentication},
+		{Version: 28, Name: "limit_notification_radius", SQL: limitNotificationRadius},
 	}
 
 	for _, migration := range migrations {

@@ -46,7 +46,7 @@ curl http://localhost:8080/api/v1/profile \
 
 | Method | Path | Notes |
 | --- | --- | --- |
-| `GET` | `/feed/nearby` | Requires `latitude`, `longitude`; optional `radius_meters` is 1–2,500. Returns spots and enforcement alerts. |
+| `GET` | `/feed/nearby` | Requires `latitude`, `longitude`; optional `radius_meters` is 1–1,500. Returns spots and enforcement alerts. |
 | `POST` | `/parking-sessions` | Starts the one active parking session for the user. Writes a durable alert lookup job. |
 | `GET` | `/parking-sessions/active` | Gets the caller's active session. |
 | `PATCH` | `/parking-sessions/:id/end` | Ends a session; optional `share_open_spot`. |
@@ -72,8 +72,8 @@ curl http://localhost:8080/api/v1/profile \
 3. From a different account, report `ticketing` or `chalking` within that
    driver's configured radius.
 4. Confirm a notification row appears and, on a real configured device, the
-   Expo push is accepted. The queue worker runs on its configured short poll
-   interval rather than a global 30-second scan.
+   Expo push is accepted. The queue worker checks for jobs every 60 seconds by
+   default (configurable with `ALERT_DISPATCH_INTERVAL`) and once at startup.
 
 Example report:
 
@@ -106,17 +106,45 @@ go test ./...
 go vet ./...
 ```
 
-The PostGIS integration tests are intentionally opt-in to avoid modifying a
-developer's ordinary database. Point them at a disposable PostGIS database:
+Run the full suite, including the spatial integration tests, in a disposable
+PostGIS Docker container (automatically removed on exit):
+
+```sh
+cd backend
+./scripts/test-integration.sh
+```
+
+The `Tests` GitHub Actions workflow also runs these tests with PostGIS on every
+pull request and push to `main`. Plain `go test ./...` skips integration tests
+unless `PARKOPTICON_TEST_DATABASE_URL` is configured. To supply your own
+disposable PostGIS database:
 
 ```sh
 PARKOPTICON_TEST_DATABASE_URL='postgres://USER:PASSWORD@HOST:PORT/DATABASE?sslmode=disable' \
-  go test ./... -count=1
+  go test -p 1 ./... -count=1
 ```
 
 Those tests cover API outbox writes, report-to-session fan-out, park-time
 matching, duplicate prevention, retry after a transient push-provider failure,
-and concurrent migration startup.
+and concurrent migration startup. Spatial coverage includes known metre
+distances, sorted nearby reports, just-inside/outside radius boundaries,
+expired/inactive exclusions, antimeridian and high-latitude locations,
+300 m verification independent of notification preferences, and both alert
+matching paths at 100, 300, 1,000, and 1,500 m. Packages run serially because
+the pipeline tests consume a shared job queue.
+
+Mobile geometry checks run without an emulator or installed native modules:
+
+```sh
+cd parkopticon
+npm test # Node 22 or newer
+npm run test:coverage
+```
+
+These cover spherical distance examples, invalid/missing coordinates,
+antimeridian/polar/antipodal cases, symmetry, and verification before display
+rounding. Mobile distances are approximate; PostGIS geography and the stored
+report coordinates remain authoritative for online verification.
 
 ## Mock mode
 

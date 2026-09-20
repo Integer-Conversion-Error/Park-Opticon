@@ -44,7 +44,7 @@ All routes below are under `/api/v1` and protected routes use
   `POST /auth/identities` — list, freshly prove control of, then link a
   Google/Apple sign-in method (the link proof is single-use)
 - `GET /profile`, `PATCH /profile/push-token`
-- `GET/PATCH /profile/preferences` — notification radius is 100–2,500 metres
+- `GET/PATCH /profile/preferences` — notification radius is 100–1,500 metres
 - `GET /feed/nearby?latitude=&longitude=&radius_meters=` — combined map feed
 - `POST /parking-sessions`, `GET /parking-sessions/active`
 - `PATCH /parking-sessions/:id/end` — accepts `share_open_spot`; shared spots

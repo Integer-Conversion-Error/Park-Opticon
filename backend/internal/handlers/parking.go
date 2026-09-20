@@ -34,15 +34,15 @@ func (h *ParkingHandler) GetNearbyParkingSpots(c *gin.Context) {
 	radiusMeters := 1000.0
 	if raw := c.Query("radius_meters"); raw != "" {
 		parsed, parseErr := strconv.ParseFloat(raw, 64)
-		if parseErr != nil || parsed <= 0 || parsed > 2500 {
-			Error(c, http.StatusBadRequest, "invalid_radius", "radius_meters must be between 1 and 2500")
+		if parseErr != nil || parsed <= 0 || parsed > 1500 {
+			Error(c, http.StatusBadRequest, "invalid_radius", "radius_meters must be between 1 and 1500")
 			return
 		}
 		radiusMeters = parsed
 	} else if raw := c.Query("radius_miles"); raw != "" {
 		parsed, parseErr := strconv.ParseFloat(raw, 64)
-		if parseErr != nil || parsed <= 0 || parsed*1609.34 > 2500 {
-			Error(c, http.StatusBadRequest, "invalid_radius", "radius must not exceed 2500 metres")
+		if parseErr != nil || parsed <= 0 || parsed*1609.34 > 1500 {
+			Error(c, http.StatusBadRequest, "invalid_radius", "radius must not exceed 1500 metres")
 			return
 		}
 		radiusMeters = parsed * 1609.34

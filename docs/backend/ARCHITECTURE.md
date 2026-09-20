@@ -62,8 +62,8 @@ after the fan-out transaction commits, so database locks remain short.
 ### Spatial matching
 
 The schema stores locations as PostGIS `geography(POINT, 4326)` values. Alert
-matching uses a 2,500-metre indexed prefilter, followed by the recipient's exact
-100–2,500 metre preference. Partial GiST indexes contain only active alerts and
+matching uses a 1,500-metre indexed prefilter, followed by the recipient's exact
+100–1,500 metre preference. Partial GiST indexes contain only active alerts and
 active parking sessions; this keeps expired history out of the hot path.
 
 ## Request and authorization model

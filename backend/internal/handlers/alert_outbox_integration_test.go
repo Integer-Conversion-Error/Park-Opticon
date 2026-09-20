@@ -50,11 +50,11 @@ func TestAlertWritesCreateOutboxJobsIntegration(t *testing.T) {
 	if notificationRadius != 1000 {
 		t.Fatalf("unexpected notification radius default: got %d want 1000", notificationRadius)
 	}
-	if _, err := db.Exec(`UPDATE users SET notification_radius_meters = 2500 WHERE id = $1`, userID); err != nil {
+	if _, err := db.Exec(`UPDATE users SET notification_radius_meters = 1500 WHERE id = $1`, userID); err != nil {
 		t.Fatalf("accept maximum notification radius: %v", err)
 	}
-	if _, err := db.Exec(`UPDATE users SET notification_radius_meters = 2501 WHERE id = $1`, userID); err == nil {
-		t.Fatal("expected notification-radius constraint to reject 2501")
+	if _, err := db.Exec(`UPDATE users SET notification_radius_meters = 1501 WHERE id = $1`, userID); err == nil {
+		t.Fatal("expected notification-radius constraint to reject 1501")
 	}
 	t.Cleanup(func() {
 		if alertID != uuid.Nil {

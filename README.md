@@ -103,8 +103,9 @@ go vet ./...
 ```
 
 The backend also contains opt-in PostGIS integration tests. See [API testing](docs/backend/API_TESTING.md)
-for the disposable-database command. The mobile package currently has no
-automated test or lint script; validate it on a simulator or real device.
+for the disposable-database command. Mobile distance and proximity unit tests
+run with `cd parkopticon && npm test` (Node 22+); validate native UI flows on a
+simulator or real device. Both test suites run in the `Tests` CI workflow.
 
 ## Documentation
 

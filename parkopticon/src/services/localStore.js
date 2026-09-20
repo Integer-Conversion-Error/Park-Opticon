@@ -1,4 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { DEFAULT_NOTIFICATION_RADIUS_METERS, normalizeNotificationRadius } from './notificationSettings';
+
+export { distanceMeters } from './geo';
 
 export const ACTIVE_PARKING_KEY = 'parkopticon.activeParking.v1';
 export const REPORTS_KEY = 'parkopticon.reports.v2';
@@ -8,7 +11,7 @@ export const PARKING_SPOT_EXPIRES_AFTER_MS = 15 * 60 * 1000;
 
 export const DEFAULT_SETTINGS = {
   notificationsEnabled: true,
-  notificationRadiusMeters: 1000,
+  notificationRadiusMeters: DEFAULT_NOTIFICATION_RADIUS_METERS,
   // Retained for compatibility with existing preference records; the map no
   // longer interrupts parking with an enforcement-question modal.
   askAboutEnforcementAfterParking: false,
@@ -52,11 +55,23 @@ const parseStoredJson = (value, fallback) => {
 
 export const loadSettings = async () => {
   const stored = parseStoredJson(await AsyncStorage.getItem(SETTINGS_KEY), {});
-  return { ...DEFAULT_SETTINGS, ...stored };
+  const settings = {
+    ...DEFAULT_SETTINGS,
+    ...stored,
+    notificationRadiusMeters: normalizeNotificationRadius(stored.notificationRadiusMeters),
+  };
+  if (stored.notificationRadiusMeters !== undefined && stored.notificationRadiusMeters !== settings.notificationRadiusMeters) {
+    await AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+  }
+  return settings;
 };
 
 export const saveSettings = async (settings) => {
-  const nextSettings = { ...DEFAULT_SETTINGS, ...settings };
+  const nextSettings = {
+    ...DEFAULT_SETTINGS,
+    ...settings,
+    notificationRadiusMeters: normalizeNotificationRadius(settings.notificationRadiusMeters),
+  };
   await AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(nextSettings));
   return nextSettings;
 };
@@ -129,23 +144,6 @@ export const formatTimeAgo = (createdAt, now = Date.now()) => {
 
 export const getReportMeta = (report) =>
   REPORT_TYPE_META[report.type] || REPORT_TYPE_META.ticketing;
-
-export const distanceMeters = (from, to) => {
-  if (!from || !to) return null;
-  const earthRadius = 6371000;
-  const latitudeDelta = ((to.latitude - from.latitude) * Math.PI) / 180;
-  const longitudeDelta = ((to.longitude - from.longitude) * Math.PI) / 180;
-  const fromLatitude = (from.latitude * Math.PI) / 180;
-  const toLatitude = (to.latitude * Math.PI) / 180;
-  const a =
-    Math.sin(latitudeDelta / 2) ** 2 +
-    Math.cos(fromLatitude) *
-      Math.cos(toLatitude) *
-      Math.sin(longitudeDelta / 2) ** 2;
-  return Math.round(
-    earthRadius * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
-  );
-};
 
 export const applyVerification = (reports, reportId, vote) =>
   reports.map((report) => {

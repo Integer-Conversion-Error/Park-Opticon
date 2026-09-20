@@ -169,7 +169,7 @@ func Load() *Config {
 			// ALERT_CHECK_INTERVAL is retained as a compatibility fallback for
 			// existing deployments. The worker now polls a durable job queue rather
 			// than scanning every active parking session.
-			AlertDispatchInterval: parseDuration(getEnv("ALERT_DISPATCH_INTERVAL", getEnv("ALERT_CHECK_INTERVAL", "1s"))),
+			AlertDispatchInterval: parseDuration(getEnv("ALERT_DISPATCH_INTERVAL", getEnv("ALERT_CHECK_INTERVAL", "60s"))),
 			ExpiryCheckInterval:   parseDuration(getEnv("SPOT_EXPIRY_CHECK_INTERVAL", "5m")),
 			JobLeaseDuration:      parseDuration(getEnv("WORKER_JOB_LEASE", "2m")),
 			DispatchBatchSize:     parseInt(getEnv("ALERT_DISPATCH_BATCH_SIZE", "25"), 25),
