@@ -10,15 +10,18 @@ permissions:
   contents: read
 
 jobs:
-  mobile-distance:
+  mobile-unit-and-components:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: '22'
-      # The pure geometry tests use Node's built-in runner and no native mocks.
-      - run: npm test
+          cache: npm
+          cache-dependency-path: parkopticon/package-lock.json
+      - run: npm ci
+        working-directory: parkopticon
+      - run: npm run test:coverage
         working-directory: parkopticon
 
   backend-postgis:
@@ -37,14 +40,16 @@ jobs:
           --health-timeout 5s
           --health-retries 12
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
           go-version-file: backend/go.mod
           cache-dependency-path: backend/go.sum
-      - run: go test -p 1 ./... -count=1
+      - run: go test -p 1 -count=1 -coverpkg=./internal/... -coverprofile="$RUNNER_TEMP/parkopticon-cover.out" ./...
         working-directory: backend
         env:
           PARKOPTICON_TEST_DATABASE_URL: postgres://postgres:spatial-tests@127.0.0.1:${{ job.services.postgres.ports['5432'] }}/parkopticon_tests?sslmode=disable
+      - run: python3 scripts/check-driver-coverage.py "$RUNNER_TEMP/parkopticon-cover.out"
+        working-directory: backend
       - run: go vet ./...
         working-directory: backend
