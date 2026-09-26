@@ -1,4 +1,4 @@
-import { Platform } from 'react-native';
+import { Platform, TurboModuleRegistry } from 'react-native';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { api } from './api';
 
@@ -46,8 +46,15 @@ const toProviderError = (provider, error) => {
 
 const getGoogleSignIn = () => {
   try {
-    // This is intentionally lazy so Expo Go can still open the rest of the app.
-    // Google native sign-in requires a development or production native build.
+    // Check before importing: the SDK calls getEnforcing during evaluation,
+    // which Metro can report as an uncaught error even inside this try/catch.
+    // Expo Go and older native builds may not contain RNGoogleSignin.
+    if (TurboModuleRegistry.get('RNGoogleSignin') === null) {
+      throw new SocialAuthError(
+        'This app build is missing RNGoogleSignin. Rebuild and install the native Park Opticon app with Google Sign-In included. Expo Go cannot run Google Sign-In.',
+        'google_native_module_missing',
+      );
+    }
     const googleSignIn = require('@react-native-google-signin/google-signin');
     if (!googleSignIn?.GoogleSignin) {
       throw new SocialAuthError(

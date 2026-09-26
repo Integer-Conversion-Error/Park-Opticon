@@ -29,6 +29,7 @@ function MainTabs() {
 
   return (
     <Tab.Navigator
+      initialRouteName={process.env.EXPO_PUBLIC_AUTH_TEST_MODE === '1' ? 'Account' : 'Map'}
       screenOptions={({ route }) => ({
         headerShown: false,
         tabBarActiveTintColor: theme.colors.primary,
@@ -59,7 +60,8 @@ function MainTabs() {
 
 export default function AppNavigator() {
   const [authChecked, setAuthChecked] = React.useState(!apiConfigured);
-  const [authenticated, setAuthenticated] = React.useState(!apiConfigured);
+  // A missing backend is a configuration error, not an authenticated session.
+  const [authenticated, setAuthenticated] = React.useState(false);
 
   React.useEffect(() => {
     if (!apiConfigured) return undefined;

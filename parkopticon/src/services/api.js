@@ -38,6 +38,9 @@ const parseError = async (response) => {
 };
 
 const request = async (path, options = {}, allowRefresh = true) => {
+  if (!apiConfigured) {
+    throw new ApiError('This build has no backend address. Configure EXPO_PUBLIC_API_URL and rebuild to complete sign-in.', 0, 'api_not_configured');
+  }
   if (!apiAvailable()) throw new ApiError('Account sync is unavailable in guest mode.', 0, 'guest_mode');
 
   const controller = new AbortController();
