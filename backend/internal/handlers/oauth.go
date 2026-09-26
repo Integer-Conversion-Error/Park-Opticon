@@ -654,7 +654,7 @@ func (h *AuthHandler) mfaKeyMaterial() string {
 func recordOAuthIdentityLink(c *gin.Context, tx *sqlx.Tx, userID uuid.UUID, provider string) bool {
 	if _, err := tx.ExecContext(c.Request.Context(), `
 		INSERT INTO audit_logs (user_id, action, entity_type, ip_address, user_agent, request_data)
-		VALUES ($1, 'oauth_identity_linked', 'oauth_identity', $2, $3, jsonb_build_object('provider', $4))
+		VALUES ($1, 'oauth_identity_linked', 'oauth_identity', $2, $3, jsonb_build_object('provider', $4::text))
 	`, userID, c.ClientIP(), c.Request.UserAgent(), provider); err != nil {
 		Error(c, http.StatusInternalServerError, "identity_link_failed", "Unable to link this sign-in method")
 		return false

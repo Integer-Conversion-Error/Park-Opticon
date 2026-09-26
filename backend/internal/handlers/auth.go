@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"database/sql"
 	"net/http"
 	"strings"
@@ -18,7 +19,14 @@ import (
 type AuthHandler struct {
 	db   *sqlx.DB
 	cfg  *config.Config
-	oidc *auth.OIDCVerifier
+	oidc identityVerifier
+}
+
+// identityVerifier keeps provider I/O behind a small seam for contract tests.
+type identityVerifier interface {
+	ProviderAvailable(provider string) bool
+	Verify(ctx context.Context, provider, rawToken, expectedNonce string) (*auth.SocialIdentity, error)
+	VerifyGoogleAuthorizationCode(ctx context.Context, code, serverClientID, clientSecret string) (*auth.SocialIdentity, error)
 }
 
 func NewAuthHandler(db *sqlx.DB, cfg *config.Config) *AuthHandler {
