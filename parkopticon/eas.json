@@ -9,10 +9,22 @@
       "distribution": "internal"
     },
     "preview": {
-      "distribution": "internal"
+      "distribution": "internal",
+      "environment": "preview",
+      "android": {
+        "buildType": "apk"
+      }
     },
     "production": {
       "autoIncrement": true
+    },
+    "local": {
+      "extends": "preview",
+      "env": {
+        "EXPO_PUBLIC_API_URL": "http://10.0.0.47:8080",
+        "PARKOPTICON_LOCAL_API_HOST": "10.0.0.47",
+        "EXPO_PUBLIC_AUTH_TEST_MODE": "1"
+      }
     }
   },
   "submit": {

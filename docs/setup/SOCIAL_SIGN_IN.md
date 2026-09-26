@@ -40,6 +40,66 @@ from taking over an existing Park Opticon account.
 The Google native SDK cannot run in Expo Go. Test it in an EAS development,
 preview, or production build.
 
+### Missing native module (`RNGoogleSignin`)
+
+This error means the installed native binary does not contain Google Sign-In.
+It happens in Expo Go or a custom app built before the dependency was added.
+Reloading JavaScript or changing OAuth client IDs cannot add the native module.
+Google actions remain visible on Android and iOS. Attempting sign-in checks
+the native module before importing the SDK and immediately reports
+`google_native_module_missing` with rebuild instructions if it is absent.
+Missing native support is treated as a broken build, not an unavailable feature.
+
+For an installable Android preview, configure the public build variables below
+in the EAS preview environment, then run:
+
+```sh
+cd parkopticon
+npx eas-cli build --platform android --profile preview
+```
+
+For full app testing, set `EXPO_PUBLIC_API_URL` to the backend origin (without
+`/api/v1`; use HTTPS for deployed environments) and `GOOGLE_MAPS_ANDROID_API_KEY`
+to a Maps SDK for Android key. The latter is embedded in the Android manifest
+by `app.config.js`; restrict it to `com.parkopticon.app` and the signing SHA-1.
+Expo Go supplies its own Maps key, but a standalone APK needs this project key
+to use the map.
+
+Opening Map in a standalone Android build without the key reports
+`google_maps_not_configured` before creating the native map view. The Map tab
+remains visible and Account remains accessible. Expo Go uses its built-in Maps
+configuration and is exempt from this check.
+
+Neither value is needed to compile the Google native SDK or exercise its account
+selection flow. Without a backend URL the app opens sign-in and reports
+`api_not_configured` when completing login, rather than silently entering guest
+mode. Completing a Park Opticon session still requires a reachable backend;
+a permanent domain is not needed for development testing.
+
+### Local Android sign-in testing
+
+The `local` EAS profile connects to `http://10.0.0.47:8080` on the same Wi-Fi/LAN.
+It uses the preview OAuth credentials and opens Account after login, so the
+session can be checked without opening the map. Google sign-in remains visible
+and missing configuration is reported as an error. The map still requires its
+own Android Maps key.
+
+```sh
+cd parkopticon
+npx eas-cli build --platform android --profile local
+```
+
+If the server address changes, update both `EXPO_PUBLIC_API_URL` and
+`PARKOPTICON_LOCAL_API_HOST` in that profile before rebuilding. The local config
+plugin permits HTTP only to that private IPv4 address; other destinations use
+the normal HTTPS policy. Production builds reject this local HTTP setting.
+`EXPO_PUBLIC_AUTH_TEST_MODE=1` selects Account as the initial tab only for this
+testing profile; ordinary builds still open Map.
+
+Install the resulting APK and open Park Opticon itself. Ensure that APK's
+signing certificate SHA-1 is registered on the Google Android OAuth client.
+Use the Web OAuth client ID for `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID`.
+
 ## 2. Configure Apple Developer
 
 1. In Apple Developer, open the explicit App ID `com.parkopticon.app`.

@@ -3,6 +3,7 @@ import {
   AppState,
   FlatList,
   Modal,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -12,6 +13,7 @@ import { useIsFocused } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import MapView, { Marker } from 'react-native-maps';
 import * as Location from 'expo-location';
+import Constants from 'expo-constants';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button } from '../components';
 import { theme } from '../theme';
@@ -35,6 +37,7 @@ import { getFastLocation } from '../services/locationService';
 import { registerForPushNotifications } from '../services/pushNotifications';
 import { canVerifyReport, VERIFICATION_RADIUS_METERS } from '../services/geo';
 import { normalizeNotificationRadius } from '../services/notificationSettings';
+import { getMapConfigurationError } from '../services/mapConfiguration';
 
 const FALLBACK_REGION = {
   latitude: 37.7749,
@@ -225,7 +228,27 @@ function NearbyReportsModal({ insets, location, now, onClose, onSelect, reports,
   );
 }
 
-export default function MapScreen({ navigation }) {
+export default function MapScreen(props) {
+  const insets = useSafeAreaInsets();
+  const error = getMapConfigurationError({
+    platform: Platform.OS,
+    executionEnvironment: Constants.executionEnvironment,
+    androidMapsConfigured: Constants.expoConfig?.extra?.androidMapsConfigured,
+  });
+  if (error) {
+    return (
+      <View style={[styles.configurationError, { paddingTop: insets.top + 24 }]}>
+        <Text accessibilityRole="header" style={styles.configurationErrorTitle}>Map configuration error</Text>
+        <Text accessibilityLiveRegion="assertive" style={styles.configurationErrorMessage}>{error.message}</Text>
+        <Text selectable style={styles.configurationErrorCode}>{error.code}</Text>
+        <Button title="Go to Account" onPress={() => props.navigation.navigate('Account')} size="large" />
+      </View>
+    );
+  }
+  return <ReadyMapScreen {...props} />;
+}
+
+function ReadyMapScreen({ navigation }) {
   const mapRef = useRef(null);
   const insets = useSafeAreaInsets();
   const { showModal } = useAppModal();
@@ -714,6 +737,10 @@ export default function MapScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
+  configurationError: { flex: 1, backgroundColor: theme.colors.background, paddingHorizontal: 24, justifyContent: 'center' },
+  configurationErrorTitle: { fontSize: 22, fontWeight: '700', color: theme.colors.text, marginBottom: 12 },
+  configurationErrorMessage: { fontSize: 16, lineHeight: 24, color: theme.colors.textSecondary, marginBottom: 12 },
+  configurationErrorCode: { fontSize: 12, color: theme.colors.error, marginBottom: 24 },
   container: { flex: 1, backgroundColor: '#DCE9F5' },
   map: { flex: 1 },
   topOverlay: {
