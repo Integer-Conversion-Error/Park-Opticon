@@ -50,7 +50,7 @@ def main(profile: Path) -> int:
 
     for target in TARGETS:
         total, covered = totals[target]
-        print(f"{target}: {covered}/{total} statements ({covered / total:.1%})")
+        print(f"{target} — {covered}/{total} statements ({covered / total:.1%})")
     total = sum(value[0] for value in totals.values())
     covered = sum(value[1] for value in totals.values())
     percent = 100 * covered / total

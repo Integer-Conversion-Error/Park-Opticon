@@ -187,7 +187,7 @@ func TestOAuthHandlerContractWithFakeProviders(t *testing.T) {
 			t.Fatal(err)
 		}
 		h.call("POST", "/reauth", map[string]any{"password": "Test-password-123!"}, http.StatusPreconditionRequired)
-		h.call("POST", "/reauth", map[string]any{"password": "Test-password-123!", "mfa_code": "000000"}, http.StatusUnauthorized)
+		h.call("POST", "/reauth", map[string]any{"password": "Test-password-123!", "mfa_code": "INVALID-CODE"}, http.StatusUnauthorized)
 		code, err := mfa.Code(secret, time.Now())
 		if err != nil {
 			t.Fatal(err)

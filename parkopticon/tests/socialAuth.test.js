@@ -7,7 +7,7 @@ const source = await readFile(new URL('../src/services/socialAuth.js', import.me
 
 // Execute the actual service with a mocked native registry. Importing the real
 // Google SDK here would require a device and hide the missing-module regression.
-const loadAuth = async ({ platform = 'android', nativeModule = null, sdk = {} } = {}) => {
+const loadAuth = async ({ platform = 'android', nativeModule = null, sdk = {}, appleAuth = {}, oauthChallenge } = {}) => {
   const calls = { imports: 0, registry: 0 };
   const context = vm.createContext({
     process: { env: {
@@ -30,8 +30,8 @@ const loadAuth = async ({ platform = 'android', nativeModule = null, sdk = {} } 
         return nativeModule;
       } },
     },
-    'expo-apple-authentication': {},
-    './api': { api: { oauthChallenge: () => { throw new Error('Google must not request an Apple challenge'); } } },
+    'expo-apple-authentication': appleAuth,
+    './api': { api: { oauthChallenge: oauthChallenge || (() => { throw new Error('Google must not request an Apple challenge'); }) } },
   };
   const module = new vm.SourceTextModule(source, { context });
   await module.link((name) => {
@@ -96,4 +96,38 @@ test('Google cancellation remains a quiet cancellation', async () => {
     configure: () => {}, hasPlayServices: async () => {}, signIn: async () => ({ type: 'cancelled' }),
   } } });
   await assert.rejects(auth.getSocialAuthPayload('google'), (error) => auth.isSocialAuthCancelled(error));
+});
+
+test('iOS Apple sign-in binds the provider token to the server nonce', async () => {
+  const challenges = [];
+  const appleAuth = {
+    AppleAuthenticationScope: { FULL_NAME: 1, EMAIL: 2 },
+    isAvailableAsync: async () => true,
+    signInAsync: async (options) => {
+      challenges.push(options);
+      return { identityToken: 'signed-apple-token', fullName: { givenName: 'Avery', familyName: 'Driver' } };
+    },
+  };
+  const { auth } = await loadAuth({
+    platform: 'ios',
+    appleAuth,
+    oauthChallenge: async (provider) => ({ provider, nonce: 'server-nonce' }),
+  });
+  const payload = await auth.getSocialAuthPayload('apple', { includeProfile: true });
+  assert.equal(payload.provider, 'apple');
+  assert.equal(payload.identity_token, 'signed-apple-token');
+  assert.equal(payload.nonce, 'server-nonce');
+  assert.equal(payload.full_name, 'Avery Driver');
+  assert.equal(challenges[0].nonce, 'server-nonce');
+});
+
+test('Apple sign-in rejects a malformed server challenge before opening native UI', async () => {
+  let nativeCalls = 0;
+  const { auth } = await loadAuth({
+    platform: 'ios',
+    appleAuth: { isAvailableAsync: async () => true, signInAsync: async () => { nativeCalls++; } },
+    oauthChallenge: async () => ({ provider: 'apple', nonce: '' }),
+  });
+  await assert.rejects(auth.getSocialAuthPayload('apple'), { code: 'invalid_oauth_challenge' });
+  assert.equal(nativeCalls, 0);
 });
