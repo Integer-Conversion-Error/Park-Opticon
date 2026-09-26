@@ -205,6 +205,7 @@ function NearbyReportsModal({ insets, location, now, onClose, onSelect, reports,
               return (
                 <Pressable
                   accessibilityRole="button"
+                  testID={`nearby-report-row-${item.id}`}
                   accessibilityLabel={`${isStale ? 'Stale open spot' : meta.label}, ${reportMeta}`}
                   accessibilityHint="Centers the map on this report"
                   onPress={() => onSelect(item)}

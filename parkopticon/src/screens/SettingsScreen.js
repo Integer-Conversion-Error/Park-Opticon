@@ -98,6 +98,7 @@ function NotchedSlider({
         ]}
         accessibilityHint="Swipe left or right to choose an alert distance"
         accessibilityLabel="Alert radius"
+        testID="settings-alert-radius"
         accessibilityRole="adjustable"
         accessibilityValue={{
           min: options[0],
@@ -230,6 +231,8 @@ export default function SettingsScreen() {
             </Text>
           </View>
           <Switch
+            accessibilityLabel="Nearby enforcement alerts"
+            testID="settings-notifications-switch"
             value={settings.notificationsEnabled}
             onValueChange={(value) =>
               updateSettings({ ...settings, notificationsEnabled: value })
@@ -284,6 +287,8 @@ export default function SettingsScreen() {
             </Text>
           </View>
           <Switch
+            accessibilityLabel="Offer to share my open spot"
+            testID="settings-share-open-spot-switch"
             value={settings.announceOpenSpotAfterUnparking}
             onValueChange={(value) =>
               updateSettings({

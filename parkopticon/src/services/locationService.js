@@ -4,10 +4,15 @@ const FAST_LOCATION_MAX_AGE_MS = 30 * 1000;
 const FAST_LOCATION_REQUIRED_ACCURACY_M = 150;
 const CURRENT_LOCATION_TIMEOUT_MS = 2500;
 
-const withTimeout = (promise, milliseconds) => Promise.race([
-  promise,
-  new Promise((_, reject) => setTimeout(() => reject(new Error('Location fix timed out')), milliseconds)),
-]);
+const withTimeout = (promise, milliseconds) => {
+  let timer;
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => {
+      timer = setTimeout(() => reject(new Error('Location fix timed out')), milliseconds);
+    }),
+  ]).finally(() => clearTimeout(timer));
+};
 
 export const requestLocationPermission = async () => {
   const { status } = await Location.requestForegroundPermissionsAsync();

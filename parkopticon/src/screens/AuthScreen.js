@@ -88,6 +88,7 @@ export default function AuthScreen({ onAuthenticated, onGuest }) {
 
         <View style={styles.card}>
           <Input
+            testID="auth-email-input"
             label="Email address"
             value={email}
             onChangeText={setEmail}
@@ -99,6 +100,7 @@ export default function AuthScreen({ onAuthenticated, onGuest }) {
             containerStyle={styles.inputField}
           />
           <Input
+            testID="auth-password-input"
             label="Password"
             value={password}
             onChangeText={setPassword}
