@@ -103,9 +103,11 @@ go vet ./...
 ```
 
 The backend also contains opt-in PostGIS integration tests. See [API testing](docs/backend/API_TESTING.md)
-for the disposable-database command. Mobile distance and proximity unit tests
-run with `cd parkopticon && npm test` (Node 22+); validate native UI flows on a
-simulator or real device. Both test suites run in the `Tests` CI workflow.
+for the disposable-database command. `cd parkopticon && npm test` runs mobile
+unit and component tests (Node 22+). The [test strategy](docs/testing/TEST_STRATEGY.md)
+defines the coverage gates, driver API matrix, and local [Waydroid Maestro
+runner](docs/testing/WAYDROID_MAESTRO.md). Hosted CI runs unit, component, and
+PostGIS tests; Waydroid is a separate local Android gate.
 
 ## Documentation
 

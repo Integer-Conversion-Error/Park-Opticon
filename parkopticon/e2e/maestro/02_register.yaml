@@ -1,0 +1,29 @@
+appId: com.parkopticon.app
+name: Email registration and account access
+---
+- launchApp:
+    clearState: true
+    permissions:
+      all: allow
+- extendedWaitUntil:
+    visible: Sign in
+    timeout: 60000
+- scrollUntilVisible:
+    element:
+      text: .*Create an account.*
+    direction: DOWN
+- tapOn:
+    text: .*Create an account.*
+- tapOn:
+    id: auth-email-input
+- inputText: ${MAESTRO_DRIVER_EMAIL}
+- tapOn:
+    id: auth-password-input
+- inputText: ${MAESTRO_DRIVER_PASSWORD}
+- hideKeyboard
+- tapOn: Create account
+- extendedWaitUntil:
+    visible: Park here
+    timeout: 30000
+- tapOn: Account
+- assertVisible: ${MAESTRO_DRIVER_EMAIL}

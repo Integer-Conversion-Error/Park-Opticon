@@ -1,0 +1,22 @@
+appId: com.parkopticon.app
+name: Parking restoration and open-spot sharing
+---
+- launchApp:
+    stopApp: true
+- runFlow:
+    when:
+      visible: No thanks
+    commands:
+      - tapOn: No thanks
+- extendedWaitUntil:
+    visible: Unpark & share
+    timeout: 30000
+- tapOn: Unpark & share
+- extendedWaitUntil:
+    visible: 1 nearby report
+    timeout: 60000
+- tapOn:
+    text: View 1 nearby reports
+- assertVisible: Open parking
+- tapOn: Close nearby reports
+- assertVisible: Park here

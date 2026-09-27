@@ -11,6 +11,8 @@ are not current operating instructions.
 | Project overview and local startup | [Root README](../README.md) |
 | Backend API, worker, and alert design | [Backend architecture](backend/ARCHITECTURE.md) |
 | Backend endpoints and test workflow | [API testing](backend/API_TESTING.md) |
+| Mobile and driver API coverage gates | [Test strategy](testing/TEST_STRATEGY.md) |
+| Local Android Maestro integration runner | [Waydroid runner](testing/WAYDROID_MAESTRO.md) |
 | Docker development and deployment limits | [Docker quick start](backend/QUICKSTART_DOCKER.md) |
 | Backend runtime configuration | [Backend README](../backend/README.md) |
 | Database migration rules | [Migration README](../backend/migrations/README.md) |

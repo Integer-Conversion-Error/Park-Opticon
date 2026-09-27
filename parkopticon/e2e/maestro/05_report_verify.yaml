@@ -1,0 +1,53 @@
+appId: com.parkopticon.app
+name: Signed-in report and proximity verification
+---
+- launchApp:
+    clearState: true
+    permissions:
+      all: allow
+- extendedWaitUntil:
+    visible: Sign in
+    timeout: 60000
+- tapOn:
+    id: auth-email-input
+- inputText: ${MAESTRO_DRIVER_EMAIL}
+- tapOn:
+    id: auth-password-input
+- inputText: ${MAESTRO_DRIVER_PASSWORD}
+- hideKeyboard
+- tapOn: Sign in
+- extendedWaitUntil:
+    visible: View 2 nearby reports
+    timeout: 30000
+- tapOn: Report enforcement activity
+- runFlow:
+    when:
+      visible: No thanks
+    commands:
+      - tapOn: No thanks
+- extendedWaitUntil:
+    visible: Report enforcement
+    timeout: 15000
+- assertVisible:
+    text: Send report
+    enabled: false
+- tapOn: Ticketing enforcement activity
+- tapOn: Send report
+- extendedWaitUntil:
+    visible: View 3 nearby reports
+    timeout: 30000
+- tapOn: View 3 nearby reports
+- tapOn:
+    id: nearby-report-row-${MAESTRO_FAR_ALERT_ID}
+- assertVisible: Move within 300 m to verify this report.
+- assertNotVisible: Confirm report
+- tapOn: Close report details
+- tapOn: View 3 nearby reports
+- tapOn:
+    id: nearby-report-row-${MAESTRO_PEER_ALERT_ID}
+- assertVisible: Did you see this too?
+- takeScreenshot: nearby-report-detail
+- tapOn: Confirm report
+- extendedWaitUntil:
+    visible: .*your confirmation raised.*
+    timeout: 15000

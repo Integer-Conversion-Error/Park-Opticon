@@ -1,0 +1,21 @@
+appId: com.parkopticon.app
+name: Prepare signed-in map for API interruption
+---
+- launchApp:
+    clearState: true
+    permissions:
+      all: allow
+- extendedWaitUntil:
+    visible: Sign in
+    timeout: 60000
+- tapOn:
+    id: auth-email-input
+- inputText: ${MAESTRO_DRIVER_EMAIL}
+- tapOn:
+    id: auth-password-input
+- inputText: ${MAESTRO_DRIVER_PASSWORD}
+- hideKeyboard
+- tapOn: Sign in
+- extendedWaitUntil:
+    visible: Park here
+    timeout: 30000

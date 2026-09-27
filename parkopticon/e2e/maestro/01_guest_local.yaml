@@ -1,0 +1,69 @@
+appId: com.parkopticon.app
+name: Guest parking and local reports
+---
+- launchApp:
+    clearState: true
+    permissions:
+      all: allow
+- extendedWaitUntil:
+    visible: Sign in
+    timeout: 60000
+- scrollUntilVisible:
+    element: Continue as guest
+    direction: DOWN
+- tapOn: Continue as guest
+- extendedWaitUntil:
+    visible: Park here
+    timeout: 30000
+- assertVisible: 0 nearby reports
+- tapOn: Account
+- scrollUntilVisible:
+    element: Notification controls
+    direction: DOWN
+- tapOn: Notification controls
+- scrollUntilVisible:
+    element:
+      id: settings-share-open-spot-switch
+    direction: DOWN
+- tapOn:
+    id: settings-share-open-spot-switch
+- back
+- tapOn: Map
+- tapOn: Park here
+- extendedWaitUntil:
+    visible: Unpark & share
+    timeout: 15000
+- tapOn: Unpark & share
+- extendedWaitUntil:
+    visible: 1 nearby report
+    timeout: 60000
+- tapOn:
+    text: View 1 nearby reports
+- assertVisible: Open parking
+- tapOn: Close nearby reports
+- tapOn: Report enforcement activity
+- runFlow:
+    when:
+      visible: No thanks
+    commands:
+      - tapOn: No thanks
+- extendedWaitUntil:
+    visible: Report enforcement
+    timeout: 15000
+- takeScreenshot: guest-report-modal
+- tapOn: Chalking enforcement activity
+- tapOn: Send report
+- extendedWaitUntil:
+    visible: 2 nearby reports
+    timeout: 30000
+- launchApp:
+    stopApp: true
+- runFlow:
+    when:
+      visible: No thanks
+    commands:
+      - tapOn: No thanks
+- extendedWaitUntil:
+    visible: 2 nearby reports
+    timeout: 30000
+- assertVisible: Park here

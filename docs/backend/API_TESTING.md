@@ -133,18 +133,20 @@ expired/inactive exclusions, antimeridian and high-latitude locations,
 matching paths at 100, 300, 1,000, and 1,500 m. Packages run serially because
 the pipeline tests consume a shared job queue.
 
-Mobile geometry checks run without an emulator or installed native modules:
+Mobile unit and component checks run without an emulator:
 
 ```sh
 cd parkopticon
+npm ci
 npm test # Node 22 or newer
 npm run test:coverage
 ```
 
-These cover spherical distance examples, invalid/missing coordinates,
-antimeridian/polar/antipodal cases, symmetry, and verification before display
-rounding. Mobile distances are approximate; PostGIS geography and the stored
-report coordinates remain authoritative for online verification.
+These cover geometry, storage, location and API behavior, and selected
+rendered screens. See the [test strategy](../testing/TEST_STRATEGY.md) and
+[Waydroid guide](../testing/WAYDROID_MAESTRO.md) for the full driver matrix and
+native journey gate. Mobile distances are approximate; PostGIS geography and
+the stored report coordinates remain authoritative for online verification.
 
 ## Mock mode
 

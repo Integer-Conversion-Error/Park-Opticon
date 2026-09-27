@@ -1,0 +1,25 @@
+appId: com.parkopticon.app
+name: Native build API access and missing map key
+---
+- launchApp:
+    clearState: true
+    permissions:
+      all: allow
+- extendedWaitUntil:
+    visible: Sign in
+    timeout: 30000
+- tapOn:
+    id: auth-email-input
+- inputText: ${MAESTRO_DRIVER_EMAIL}
+- tapOn:
+    id: auth-password-input
+- inputText: ${MAESTRO_DRIVER_PASSWORD}
+- hideKeyboard
+- tapOn: Sign in
+- extendedWaitUntil:
+    visible: Map configuration error
+    timeout: 30000
+- assertVisible: google_maps_not_configured
+- takeScreenshot: native-map-configuration
+- tapOn: Go to Account
+- assertVisible: ${MAESTRO_DRIVER_EMAIL}

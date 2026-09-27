@@ -1,0 +1,30 @@
+appId: com.parkopticon.app
+name: Inaccurate location blocks report submission
+---
+- launchApp:
+    clearState: true
+    permissions:
+      all: allow
+- extendedWaitUntil:
+    visible: Sign in
+    timeout: 60000
+- scrollUntilVisible:
+    element: Continue as guest
+    direction: DOWN
+- tapOn: Continue as guest
+- extendedWaitUntil:
+    visible: Park here
+    timeout: 30000
+- tapOn: Report enforcement activity
+- runFlow:
+    when:
+      visible: No thanks
+    commands:
+      - tapOn: No thanks
+- tapOn: Ticketing enforcement activity
+- tapOn: Send report
+- extendedWaitUntil:
+    visible: Couldn’t send this report yet. Try again.
+    timeout: 15000
+- tapOn: Close report enforcement
+- assertVisible: 0 nearby reports

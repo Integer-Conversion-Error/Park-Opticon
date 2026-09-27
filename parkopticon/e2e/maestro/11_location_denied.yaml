@@ -1,0 +1,36 @@
+appId: com.parkopticon.app
+name: Denied location stays understandable and blocks reports
+---
+- launchApp:
+    clearState: true
+    permissions:
+      location: deny
+- extendedWaitUntil:
+    visible: Sign in
+    timeout: 60000
+- scrollUntilVisible:
+    element: Continue as guest
+    direction: DOWN
+- tapOn: Continue as guest
+- tapOn: Don.*allow
+- extendedWaitUntil:
+    visible: Location unavailable · Retry
+    timeout: 30000
+- tapOn: Report enforcement activity
+- runFlow:
+    when:
+      visible: Don.*allow
+    commands:
+      - tapOn: Don.*allow
+- tapOn: Chalking enforcement activity
+- tapOn: Send report
+- runFlow:
+    when:
+      visible: Don.*allow
+    commands:
+      - tapOn: Don.*allow
+- extendedWaitUntil:
+    visible: Couldn’t send this report yet. Try again.
+    timeout: 15000
+- tapOn: Close report enforcement
+- assertVisible: 0 nearby reports

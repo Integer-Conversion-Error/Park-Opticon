@@ -1,0 +1,12 @@
+appId: com.parkopticon.app
+name: Local-only parking can be cleared after API recovery
+---
+- launchApp:
+    stopApp: true
+- extendedWaitUntil:
+    visible: Unpark & share
+    timeout: 30000
+- tapOn: Unpark & share
+- extendedWaitUntil:
+    visible: Park here
+    timeout: 60000

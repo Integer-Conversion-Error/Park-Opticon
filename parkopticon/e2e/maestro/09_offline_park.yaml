@@ -1,0 +1,10 @@
+appId: com.parkopticon.app
+name: API interruption preserves local parked state
+---
+- tapOn: Park here
+- extendedWaitUntil:
+    visible: Could not sync parking protection
+    timeout: 25000
+- tapOn: OK
+- assertVisible: Unpark & share
+- assertVisible: Parked · saved locally

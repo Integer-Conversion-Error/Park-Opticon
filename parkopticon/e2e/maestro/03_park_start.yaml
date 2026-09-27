@@ -1,0 +1,44 @@
+appId: com.parkopticon.app
+name: Signed-in settings and parking start
+---
+- launchApp:
+    clearState: true
+    permissions:
+      all: allow
+- extendedWaitUntil:
+    visible: Sign in
+    timeout: 60000
+- tapOn:
+    id: auth-email-input
+- inputText: ${MAESTRO_DRIVER_EMAIL}
+- tapOn:
+    id: auth-password-input
+- inputText: ${MAESTRO_DRIVER_PASSWORD}
+- hideKeyboard
+- tapOn: Sign in
+- extendedWaitUntil:
+    visible: Park here
+    timeout: 30000
+- tapOn: Account
+- scrollUntilVisible:
+    element: Notification controls
+    direction: DOWN
+- tapOn: Notification controls
+- tapOn:
+    id: settings-notifications-switch
+- scrollUntilVisible:
+    element:
+      id: settings-share-open-spot-switch
+    direction: DOWN
+- extendedWaitUntil:
+    visible:
+      id: settings-share-open-spot-switch
+      checked: true
+    timeout: 15000
+- back
+- tapOn: Map
+- tapOn: Park here
+- extendedWaitUntil:
+    visible: Unpark & share
+    timeout: 15000
+- assertVisible: Parked · .* min
