@@ -35,7 +35,7 @@ export const getFastLocation = async ({ allowStaleFallback = false } = {}) => {
 
   try {
     const current = await withTimeout(
-      Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced, mayShowUserSettingsDialog: true }),
+      Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced, mayShowUserSettingsDialog: false }),
       CURRENT_LOCATION_TIMEOUT_MS,
     );
     return { ...current, source: 'current' };

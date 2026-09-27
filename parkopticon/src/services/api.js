@@ -141,6 +141,7 @@ export const api = {
   updatePreferences: (payload) => request('/api/v1/profile/preferences', { method: 'PATCH', body: JSON.stringify(payload) }),
   nearby: (latitude, longitude, radiusMeters) => request(`/api/v1/feed/nearby?latitude=${encodeURIComponent(latitude)}&longitude=${encodeURIComponent(longitude)}&radius_meters=${encodeURIComponent(radiusMeters)}`),
   startSession: (payload) => request('/api/v1/parking-sessions', { method: 'POST', body: JSON.stringify(payload) }),
+  activeSession: () => request('/api/v1/parking-sessions/active'),
   endSession: (id, shareOpenSpot) => request(`/api/v1/parking-sessions/${id}/end`, { method: 'PATCH', body: JSON.stringify({ share_open_spot: shareOpenSpot }) }),
   createEnforcementAlert: (payload) => request('/api/v1/enforcement-alerts', { method: 'POST', body: JSON.stringify(payload) }),
   verifyReport: (type, id, payload) => request(`/api/v1/${type === 'parking' ? 'parking-spots' : 'enforcement-alerts'}/${id}/verifications`, { method: 'POST', body: JSON.stringify(payload) }),

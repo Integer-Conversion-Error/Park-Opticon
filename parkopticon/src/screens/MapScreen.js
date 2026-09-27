@@ -38,6 +38,7 @@ import { registerForPushNotifications } from '../services/pushNotifications';
 import { canVerifyReport, VERIFICATION_RADIUS_METERS } from '../services/geo';
 import { normalizeNotificationRadius } from '../services/notificationSettings';
 import { getMapConfigurationError } from '../services/mapConfiguration';
+import { reconcileParkingSession, resolveParkingSessionForEnd } from '../services/parkingSession';
 
 const FALLBACK_REGION = {
   latitude: 37.7749,
@@ -323,16 +324,21 @@ function ReadyMapScreen({ navigation }) {
         })).catch(() => null) : Promise.resolve(null),
         apiAvailable() && location ? api.nearby(location.latitude, location.longitude, settings.notificationRadiusMeters).then(normalizeFeed) : loadReports(),
         getPrivateSession(),
+        apiAvailable() ? api.activeSession().catch(() => null) : Promise.resolve(null),
         apiAvailable() ? api.notifications().catch(() => null) : Promise.resolve(null),
-      ]).then(([localSettings, remoteSettings, storedReports, storedSession, notificationResponse]) => {
+      ]).then(([localSettings, remoteSettings, storedReports, storedSession, remoteSessionState, notificationResponse]) => {
         if (!mounted) return;
         setSettings(remoteSettings || localSettings);
         setReports(storedReports);
-        if (!sessionHydratedRef.current) {
-          const hydratedSession = storedSession || null;
+        const hydratedSession = reconcileParkingSession(storedSession, remoteSessionState);
+        if (!finishingSessionRef.current && (!sessionHydratedRef.current || activeSessionRef.current !== hydratedSession?.id)) {
           setParkingSession(hydratedSession);
           activeSessionRef.current = hydratedSession?.id || null;
           sessionHydratedRef.current = true;
+          if (storedSession?.id !== hydratedSession?.id) {
+            if (hydratedSession) savePrivateSession(hydratedSession).catch(() => {});
+            else if (storedSession) clearPrivateSession().catch(() => {});
+          }
         }
         setLatestNotification(notificationResponse?.notifications?.find((item) => (item.read_at === null || item.read_at === undefined) && item.status !== 'read') || null);
         setSyncError(apiAvailable() ? '' : (apiConfigured
@@ -481,14 +487,20 @@ function ReadyMapScreen({ navigation }) {
     activeSessionRef.current = null;
     try {
       let apiSession = session;
-      if (apiAvailable() && !apiSession.id?.includes('-') && sessionSyncRef.current) {
-        apiSession = await sessionSyncRef.current || apiSession;
+      if (apiAvailable() && !apiSession.id?.includes('-')) {
+        if (sessionSyncRef.current) {
+          apiSession = await sessionSyncRef.current || apiSession;
+        }
+        // After an offline start, create the missing server session on recovery
+        // so an open spot is actually shared when the driver taps Unpark.
+        apiSession = await resolveParkingSessionForEnd(apiSession, shareOpenSpot, api);
       }
       if (apiAvailable() && apiSession.id?.includes('-')) {
         await api.endSession(apiSession.id, shareOpenSpot);
         if (location) {
-          const refreshed = await api.nearby(location.latitude, location.longitude, settings.notificationRadiusMeters);
-          setReports(normalizeFeed(refreshed));
+          api.nearby(location.latitude, location.longitude, settings.notificationRadiusMeters)
+            .then((refreshed) => setReports(normalizeFeed(refreshed)))
+            .catch(() => {});
         }
       }
       await clearPrivateSession();
@@ -519,6 +531,7 @@ function ReadyMapScreen({ navigation }) {
         setTimeout(() => setSessionNotice(''), 3500);
       }
     } catch (error) {
+      activeSessionRef.current = session.id;
       showModal('Could not finish parking session', error.message || 'Please try again.');
     } finally {
       finishingSessionRef.current = false;

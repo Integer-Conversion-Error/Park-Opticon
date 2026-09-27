@@ -1,7 +1,13 @@
 import { Platform } from 'react-native';
-import * as Notifications from 'expo-notifications';
+import Constants from 'expo-constants';
 
-if (Platform.OS !== 'web') {
+let notificationsModule;
+
+const getNotifications = () => {
+  if (notificationsModule) return notificationsModule;
+  // Expo Go has no remote-push implementation. Import the native module only
+  // in a build that can actually register a device token.
+  const Notifications = require('expo-notifications');
   Notifications.setNotificationHandler({
     handleNotification: async () => ({
       shouldShowAlert: true,
@@ -9,10 +15,13 @@ if (Platform.OS !== 'web') {
       shouldSetBadge: true,
     }),
   });
-}
+  notificationsModule = Notifications;
+  return Notifications;
+};
 
 export const registerForPushNotifications = async () => {
-  if (Platform.OS === 'web') return null;
+  if (Platform.OS === 'web' || Constants.executionEnvironment === 'storeClient') return null;
+  const Notifications = getNotifications();
 
   if (Platform.OS === 'android') {
     await Notifications.setNotificationChannelAsync('parking-alerts', {

@@ -1,4 +1,5 @@
 import * as Notifications from 'expo-notifications';
+import Constants from 'expo-constants';
 import { registerForPushNotifications } from '../src/services/pushNotifications';
 
 jest.mock('expo-notifications', () => ({
@@ -10,12 +11,21 @@ jest.mock('expo-notifications', () => ({
   requestPermissionsAsync: jest.fn(),
   getExpoPushTokenAsync: jest.fn(),
 }));
+jest.mock('expo-constants', () => ({ __esModule: true, default: { executionEnvironment: 'bare' } }));
 
 beforeEach(() => {
   jest.clearAllMocks();
+  Constants.executionEnvironment = 'bare';
   Notifications.setNotificationChannelAsync.mockResolvedValue();
   Notifications.getPermissionsAsync.mockResolvedValue({ status: 'granted' });
   Notifications.getExpoPushTokenAsync.mockResolvedValue({ data: 'ExpoPushToken[test]' });
+});
+
+test('Expo Go does not initialize unsupported remote push', async () => {
+  Constants.executionEnvironment = 'storeClient';
+  await expect(registerForPushNotifications()).resolves.toBeNull();
+  expect(Notifications.getPermissionsAsync).not.toHaveBeenCalled();
+  expect(Notifications.getExpoPushTokenAsync).not.toHaveBeenCalled();
 });
 
 test('a granted permission returns the provider token', async () => {

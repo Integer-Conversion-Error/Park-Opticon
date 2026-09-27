@@ -34,7 +34,7 @@ test('fresh last-known location avoids another GPS request', async () => {
 test('current position is used when no fresh cached fix exists', async () => {
   Location.getCurrentPositionAsync.mockResolvedValue(position);
   await expect(getFastLocation()).resolves.toMatchObject({ coords: position.coords, source: 'current' });
-  expect(Location.getCurrentPositionAsync).toHaveBeenCalledWith({ accuracy: Location.Accuracy.Balanced, mayShowUserSettingsDialog: true });
+  expect(Location.getCurrentPositionAsync).toHaveBeenCalledWith({ accuracy: Location.Accuracy.Balanced, mayShowUserSettingsDialog: false });
 });
 
 test('stale fallback is available only when requested', async () => {
