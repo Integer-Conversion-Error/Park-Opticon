@@ -1,6 +1,6 @@
 # Current mobile design reference
 
-**Status — 2026-09-13:** this is the current design contract for the focused
+**Status — 2026-11-20:** this is the current design contract for the focused
 parking MVP. Follow the registered routes in
 `parkopticon/src/navigation/AppNavigator.js` and the implementations in
 `parkopticon/src/screens/`.
@@ -59,6 +59,20 @@ accuracy, loading indicators, refresh controls, or location-specific errors.
 The 50 m accuracy guard remains in code to protect report quality.
 
 ## Visual and interaction rules
+
+- Share the same iPhone-inspired layout on iOS and Android: a floating,
+  two-destination tab pill, rounded action cards, floating modal sheets, and
+  grouped Account and Settings content. Use the platform system font.
+- Follow the device's light/dark appearance. Functional surfaces stay mostly
+  opaque for legibility over the map; the navigation pill has a restrained
+  translucent surface with a solid appearance fallback.
+- The tab navigator floats over the map and reports its full height, including
+  the bottom system inset. Position map actions above that height, preserve
+  native map attribution, and add equivalent bottom scroll space on Account.
+- Account leads with identity and real community impact, then grouped
+  preferences. Expand sign-in methods within that group to retain secure
+  provider linking. Settings uses native switches and the existing accessible
+  radius control under a standard stack header.
 
 - Use the theme in `parkopticon/src/theme/`: quiet slate surfaces, deep teal
   primary actions, and amber/red only for meaningful report states.

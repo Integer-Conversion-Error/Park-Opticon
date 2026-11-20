@@ -6,6 +6,7 @@ import { DEFAULT_SETTINGS, loadSettings, saveSettings } from '../src/services/lo
 
 jest.mock('@expo/vector-icons', () => ({ Ionicons: () => null }));
 jest.mock('@react-navigation/native', () => ({ useIsFocused: () => true }));
+jest.mock('react-native-safe-area-context', () => ({ useSafeAreaInsets: () => ({ top: 0, bottom: 24, left: 0, right: 0 }) }));
 jest.mock('../src/services/api', () => ({
   apiAvailable: jest.fn(),
   api: { preferences: jest.fn(), updatePreferences: jest.fn() },

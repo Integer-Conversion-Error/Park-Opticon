@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, KeyboardAvoidingView, Linking, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useIsFocused } from '@react-navigation/native';
+import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as AppleAuthentication from 'expo-apple-authentication';
-import { theme } from '../theme';
+import { useThemedStyles } from '../theme';
 import { Button, Input } from '../components';
 import { apiAvailable, api } from '../services/api';
 import { emitSignedOut } from '../services/authEvents';
@@ -41,6 +43,9 @@ const getInitials = (value) => {
 };
 
 export default function ProfileScreen({ navigation }) {
+  const { theme, styles } = useThemedStyles(createStyles);
+  const insets = useSafeAreaInsets();
+  const tabBarHeight = useBottomTabBarHeight();
   const guestMode = !apiAvailable();
   const isFocused = useIsFocused();
   const { showModal } = useAppModal();
@@ -62,6 +67,7 @@ export default function ProfileScreen({ navigation }) {
   const [linkFlowError, setLinkFlowError] = useState('');
   const [appleAvailable, setAppleAvailable] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
+  const [signInMethodsExpanded, setSignInMethodsExpanded] = useState(false);
 
   useEffect(() => {
     if (Platform.OS !== 'ios') return undefined;
@@ -306,7 +312,7 @@ export default function ProfileScreen({ navigation }) {
     if (reauthLoading) {
       return reauthenticationMethod === 'password' ? null : (
         <View style={styles.reauthWorking}>
-          <ActivityIndicator color={theme.colors.primary} size="small" />
+          <ActivityIndicator color={theme.colors.primaryDark} size="small" />
           <Text style={styles.reauthWorkingText}>Confirming your account…</Text>
         </View>
       );
@@ -320,7 +326,7 @@ export default function ProfileScreen({ navigation }) {
           <View style={styles.reauthAppleButtonWrap}>
             <AppleAuthentication.AppleAuthenticationButton
               buttonType={AppleAuthentication.AppleAuthenticationButtonType.CONTINUE}
-              buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.BLACK}
+              buttonStyle={(theme.dark ? AppleAuthentication.AppleAuthenticationButtonStyle.WHITE : AppleAuthentication.AppleAuthenticationButtonStyle.BLACK)}
               cornerRadius={12}
               onPress={() => completeReauthentication(identity.provider)}
               style={styles.reauthAppleButton}
@@ -356,192 +362,213 @@ export default function ProfileScreen({ navigation }) {
     });
   };
 
+  const renderSignInMethods = () => (
+    <View style={styles.signInMethodsDetails}>
+      <Text style={styles.signInMethodsIntro}>Link a provider you own to use it for future sign-ins.</Text>
+      {identitiesLoading ? (
+        <View style={styles.identityLoading}>
+          <ActivityIndicator color={theme.colors.primaryDark} />
+          <Text style={styles.identityLoadingText}>Loading linked sign-in methods…</Text>
+        </View>
+      ) : identitiesError ? (
+        <View style={styles.identityError}>
+          <Text style={styles.identityErrorText}>{identitiesError}</Text>
+          <Pressable accessibilityRole="button" onPress={() => setReloadKey((current) => current + 1)} style={styles.retryButton}>
+            <Text style={styles.retryButtonText}>Try again</Text>
+          </Pressable>
+        </View>
+      ) : identityProviders.length ? identityProviders.map((provider, index) => {
+        const identity = identities.find((item) => item.provider === provider.provider);
+        const isLinking = linkingProvider === provider.provider;
+        return (
+          <View key={provider.provider} style={[styles.signInMethodRow, index > 0 && styles.rowBorder]}>
+            <View style={styles.signInMethodLeading}>
+              <View style={styles.signInMethodIcon}>
+                <Ionicons name={provider.icon} size={20} color={provider.provider === 'google' ? '#4285F4' : theme.colors.text} />
+              </View>
+              <View style={styles.signInMethodCopy}>
+                <Text style={styles.signInMethodTitle}>{socialProviderLabels[provider.provider]}</Text>
+                <Text style={styles.signInMethodStatus}>{formatConnection(identity)}</Text>
+              </View>
+            </View>
+            {identity ? (
+              <View style={styles.connectedBadge}>
+                <Ionicons name="checkmark-circle" size={14} color={theme.colors.success} />
+                <Text style={styles.connectedBadgeText}>Linked</Text>
+              </View>
+            ) : isLinking ? (
+              <ActivityIndicator color={theme.colors.primaryDark} size="small" />
+            ) : provider.provider === 'apple' ? (
+              <View pointerEvents={linkingProvider ? 'none' : 'auto'} style={styles.appleLinkButtonWrap}>
+                <AppleAuthentication.AppleAuthenticationButton
+                  buttonType={AppleAuthentication.AppleAuthenticationButtonType.CONTINUE}
+                  buttonStyle={(theme.dark ? AppleAuthentication.AppleAuthenticationButtonStyle.WHITE : AppleAuthentication.AppleAuthenticationButtonStyle.BLACK)}
+                  cornerRadius={8}
+                  onPress={() => beginLinkIdentity(provider.provider)}
+                  style={styles.appleLinkButton}
+                />
+              </View>
+            ) : (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Link Google account"
+                disabled={Boolean(linkingProvider || linkFlow)}
+                onPress={() => beginLinkIdentity(provider.provider)}
+                style={({ pressed }) => [styles.linkButton, pressed && !linkingProvider && styles.linkButtonPressed]}
+              >
+                <Text style={styles.linkButtonText}>Link</Text>
+              </Pressable>
+            )}
+          </View>
+        );
+      }) : (
+        <Text style={styles.identityEmptyText}>Sign-in methods are available in the Parkopticon iOS and Android apps.</Text>
+      )}
+    </View>
+  );
+
+  const showImpactExplanation = () => showModal(
+    'How impact is counted',
+    'Reports shared are your open-spot shares and original enforcement alerts. A report is confirmed when another driver confirms it. Reports checked are your current confirmations or corrections. Drivers alerted counts unique other accounts for which Parkopticon created an enforcement notification from one of your original alerts; it is not a delivery or read count.',
+  );
+
   return (
     <>
-      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Text style={styles.title}>Your account</Text>
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={[styles.content, { paddingTop: insets.top + 18, paddingBottom: tabBarHeight + 24 }]}
+        showsVerticalScrollIndicator={false}
+      >
+        <Text accessibilityRole="header" style={styles.title}>Account</Text>
 
-      <View style={styles.identityCard}>
-        <View style={styles.identityTopRow}>
+        <View style={styles.identityCard}>
           <View style={styles.avatar}><Text style={styles.avatarText}>{guestMode ? 'G' : getInitials(displayName)}</Text></View>
           <View style={styles.identityCopy}>
             <Text style={styles.userName}>{displayName}</Text>
             <Text style={styles.userEmail}>{displayEmail}</Text>
           </View>
-          <View style={styles.memberBadge}><Text style={styles.memberBadgeText}>{guestMode ? 'GUEST' : 'MEMBER'}</Text></View>
         </View>
-        <View style={styles.identityDivider} />
-        <Text style={styles.identityHint}>{guestMode ? 'Guest reports and settings stay on this device until you sign in.' : 'Your contribution helps drivers make faster, safer parking decisions.'}</Text>
-      </View>
 
-      {!guestMode ? (
-        <>
-          <Text style={styles.sectionLabel}>SIGN-IN METHODS</Text>
-          <View style={styles.signInMethodsCard}>
-            <Text style={styles.signInMethodsIntro}>Link a provider you own to use it for future sign-ins. We never receive your provider password.</Text>
-            {identitiesLoading ? (
-              <View style={styles.identityLoading}>
-                <ActivityIndicator color={theme.colors.primary} />
-                <Text style={styles.identityLoadingText}>Loading linked sign-in methods…</Text>
-              </View>
-            ) : identitiesError ? (
-              <View style={styles.identityError}>
-                <Text style={styles.identityErrorText}>{identitiesError}</Text>
-                <Pressable accessibilityRole="button" onPress={() => setReloadKey((current) => current + 1)} style={styles.retryButton}>
-                  <Text style={styles.retryButtonText}>Try again</Text>
-                </Pressable>
-              </View>
-            ) : identityProviders.length ? identityProviders.map((provider, index) => {
-              const identity = identities.find((item) => item.provider === provider.provider);
-              const isLinking = linkingProvider === provider.provider;
-              return (
-                <View key={provider.provider} style={[styles.signInMethodRow, index > 0 && styles.rowBorder]}>
-                  <View style={styles.signInMethodLeading}>
-                    <View style={styles.signInMethodIcon}>
-                      <Ionicons name={provider.icon} size={20} color={provider.provider === 'google' ? '#4285F4' : theme.colors.text} />
-                    </View>
-                    <View style={styles.signInMethodCopy}>
-                      <Text style={styles.signInMethodTitle}>{socialProviderLabels[provider.provider]}</Text>
-                      <Text style={styles.signInMethodStatus}>{formatConnection(identity)}</Text>
-                    </View>
-                  </View>
-                  {identity ? (
-                    <View style={styles.connectedBadge}>
-                      <Ionicons name="checkmark-circle" size={14} color={theme.colors.success} />
-                      <Text style={styles.connectedBadgeText}>Linked</Text>
-                    </View>
-                  ) : isLinking ? (
-                    <ActivityIndicator color={theme.colors.primary} size="small" />
-                  ) : provider.provider === 'apple' ? (
-                    <View pointerEvents={linkingProvider ? 'none' : 'auto'} style={styles.appleLinkButtonWrap}>
-                      <AppleAuthentication.AppleAuthenticationButton
-                        buttonType={AppleAuthentication.AppleAuthenticationButtonType.CONTINUE}
-                        buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.BLACK}
-                        cornerRadius={8}
-                        onPress={() => beginLinkIdentity(provider.provider)}
-                        style={styles.appleLinkButton}
-                      />
-                    </View>
-                  ) : (
-                    <Pressable
-                      accessibilityRole="button"
-                      accessibilityLabel="Link Google account"
-                      disabled={Boolean(linkingProvider || linkFlow)}
-                      onPress={() => beginLinkIdentity(provider.provider)}
-                      style={({ pressed }) => [styles.linkButton, pressed && !linkingProvider && styles.linkButtonPressed]}
-                    >
-                      <Text style={styles.linkButtonText}>Link</Text>
-                    </Pressable>
-                  )}
+        <View style={styles.sectionHeading}>
+          <Text style={styles.sectionLabel}>Community impact</Text>
+          {!guestMode && impact && hasCommunityActivity ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Learn how community impact is counted"
+              onPress={showImpactExplanation}
+              style={styles.impactHelp}
+            >
+              <Text style={styles.impactHelpText}>How counted</Text>
+            </Pressable>
+          ) : null}
+        </View>
+        {guestMode ? (
+          <View style={styles.impactStatusCard}>
+            <View style={styles.impactStatusIcon}><Ionicons name="person-outline" size={20} color={theme.colors.primaryDark} /></View>
+            <View style={styles.impactStatusCopy}>
+              <Text style={styles.impactStatusTitle}>Sign in to track your impact</Text>
+              <Text style={styles.impactStatusText}>Guest reports and settings stay on this device.</Text>
+            </View>
+          </View>
+        ) : impactLoading && !impact ? (
+          <View style={styles.impactStatusCard}>
+            <ActivityIndicator color={theme.colors.primaryDark} />
+            <Text style={styles.impactLoadingText}>Loading your community activity…</Text>
+          </View>
+        ) : impact && hasCommunityActivity ? (
+          <>
+            {impactError ? <Text style={styles.impactSyncWarning}>Could not refresh. Showing the last loaded activity.</Text> : null}
+            <View style={styles.statsCard}>
+              {impactMetrics.map((metric, index) => (
+                <View
+                  key={metric.label}
+                  accessible
+                  accessibilityLabel={`${metric.label}: ${formatCount(metric.value)}. ${metric.detail}`}
+                  style={[
+                    styles.stat,
+                    index % 2 === 0 && styles.statRightBorder,
+                  ]}
+                >
+                  <Text adjustsFontSizeToFit minimumFontScale={0.75} numberOfLines={1} style={styles.statValue}>{formatCount(metric.value)}</Text>
+                  <Text style={styles.statLabel}>{metric.label}</Text>
                 </View>
-              );
-            }) : (
-              <Text style={styles.identityEmptyText}>Sign-in methods are available in the Parkopticon iOS and Android apps.</Text>
-            )}
+              ))}
+            </View>
+          </>
+        ) : impact ? (
+          <View style={styles.impactStatusCard}>
+            <View style={styles.impactStatusIcon}><Ionicons name="pulse-outline" size={20} color={theme.colors.primaryDark} /></View>
+            <View style={styles.impactStatusCopy}>
+              <Text style={styles.impactStatusTitle}>No community activity yet</Text>
+              <Text style={styles.impactStatusText}>Share an open spot, report enforcement, or check a nearby report to start a transparent contribution history.</Text>
+            </View>
           </View>
-        </>
-      ) : null}
+        ) : (
+          <View style={styles.impactStatusCard}>
+            <View style={styles.impactStatusCopy}>
+              <Text style={styles.impactStatusTitle}>Community activity unavailable</Text>
+              <Text style={styles.impactStatusText}>{impactError || 'We did not replace it with estimates. Try again when you are online.'}</Text>
+              <Pressable accessibilityRole="button" onPress={() => setReloadKey((current) => current + 1)} style={styles.retryButton}>
+                <Text style={styles.retryButtonText}>Try again</Text>
+              </Pressable>
+            </View>
+          </View>
+        )}
 
-      <Text style={styles.sectionLabel}>COMMUNITY IMPACT</Text>
-      {guestMode ? (
-        <View style={styles.impactStatusCard}>
-          <View style={styles.impactStatusIcon}><Ionicons name="person-outline" size={20} color={theme.colors.primary} /></View>
-          <View style={styles.impactStatusCopy}>
-            <Text style={styles.impactStatusTitle}>Sign in to track your impact</Text>
-            <Text style={styles.impactStatusText}>Guest reports stay on this device, so they are not presented as live community metrics.</Text>
-          </View>
-        </View>
-      ) : impactLoading && !impact ? (
-        <View style={styles.impactStatusCard}>
-          <ActivityIndicator color={theme.colors.primary} />
-          <Text style={styles.impactLoadingText}>Loading your community activity…</Text>
-        </View>
-      ) : impact && hasCommunityActivity ? (
-        <>
-          <Text style={styles.impactIntro}>A record of what you shared, checked, and helped surface—not a reputation score.</Text>
-          {impactError ? <Text style={styles.impactSyncWarning}>Could not refresh. Showing the last loaded activity.</Text> : null}
-          <View style={styles.statsCard}>
-            {impactMetrics.map((metric, index) => (
-              <View
-                key={metric.label}
-                style={[
-                  styles.stat,
-                  index % 2 === 0 && styles.statRightBorder,
-                  index >= 2 && styles.statTopBorder,
-                ]}
+        <Text style={[styles.sectionLabel, styles.preferencesLabel]}>Preferences</Text>
+        <View style={styles.card}>
+          {!guestMode ? (
+            <>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Sign-in methods"
+                accessibilityState={{ expanded: signInMethodsExpanded }}
+                onPress={() => setSignInMethodsExpanded((current) => !current)}
+                style={styles.accountRow}
               >
-                <View style={styles.statHeading}>
-                  <Ionicons name={metric.icon} size={16} color={theme.colors.primary} />
-                  <Text style={styles.statValue}>{formatCount(metric.value)}</Text>
-                </View>
-                <Text style={styles.statLabel}>{metric.label}</Text>
-                <Text style={styles.statDetail}>{metric.detail}</Text>
-              </View>
-            ))}
-          </View>
+                <Ionicons name="key-outline" size={21} color={theme.colors.textSecondary} />
+                <View style={styles.rowCopy}><Text style={styles.rowTitle}>Sign-in methods</Text></View>
+                <Ionicons name={signInMethodsExpanded ? 'chevron-up' : 'chevron-forward'} size={17} color={theme.colors.textSecondary} />
+              </Pressable>
+              {signInMethodsExpanded ? renderSignInMethods() : null}
+              <View style={styles.rowBorder} />
+            </>
+          ) : null}
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Learn how community impact is counted"
-            onPress={() => showModal(
-              'How impact is counted',
-              'Reports shared are your open-spot shares and original enforcement alerts. A report is confirmed when another driver confirms it. Reports checked are your current confirmations or corrections. Drivers alerted counts unique other accounts for which Parkopticon created an enforcement notification from one of your original alerts; it is not a delivery or read count.',
-            )}
-            style={styles.impactHelp}
+            accessibilityLabel="Notification controls"
+            onPress={() => navigation.navigate('Settings')}
+            style={styles.accountRow}
           >
-            <Ionicons name="information-circle-outline" size={16} color={theme.colors.primary} />
-            <Text style={styles.impactHelpText}>How these are counted</Text>
+            <Ionicons name="options-outline" size={21} color={theme.colors.textSecondary} />
+            <View style={styles.rowCopy}><Text style={styles.rowTitle}>Notification controls</Text></View>
+            <Ionicons name="chevron-forward" size={17} color={theme.colors.textSecondary} />
           </Pressable>
-        </>
-      ) : impact ? (
-        <View style={styles.impactStatusCard}>
-          <View style={styles.impactStatusIcon}><Ionicons name="pulse-outline" size={20} color={theme.colors.primary} /></View>
-          <View style={styles.impactStatusCopy}>
-            <Text style={styles.impactStatusTitle}>No community activity yet</Text>
-            <Text style={styles.impactStatusText}>Share an open spot, report enforcement, or check a nearby report to start a transparent contribution history.</Text>
-          </View>
+          <View style={styles.rowBorder} />
+          <Pressable
+            accessibilityRole="link"
+            accessibilityLabel="Email Parkopticon support"
+            accessibilityHint="Opens an email with the Parkopticon subject prefix"
+            onPress={openSupportEmail}
+            style={styles.accountRow}
+          >
+            <Ionicons name="help-circle-outline" size={21} color={theme.colors.textSecondary} />
+            <View style={styles.rowCopy}>
+              <Text style={styles.rowTitle}>Support</Text>
+              <Text selectable style={styles.rowSubtitle}>{SUPPORT_EMAIL}</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={17} color={theme.colors.textSecondary} />
+          </Pressable>
         </View>
-      ) : (
-        <View style={styles.impactStatusCard}>
-          <View style={styles.impactStatusCopy}>
-            <Text style={styles.impactStatusTitle}>Community activity unavailable</Text>
-            <Text style={styles.impactStatusText}>{impactError || 'We did not replace it with estimates. Try again when you are online.'}</Text>
-            <Pressable accessibilityRole="button" onPress={() => setReloadKey((current) => current + 1)} style={styles.retryButton}>
-              <Text style={styles.retryButtonText}>Try again</Text>
-            </Pressable>
-          </View>
-        </View>
-      )}
 
-      <Text style={styles.sectionLabel}>PREFERENCES</Text>
-      <View style={styles.card}>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Notification controls"
-          onPress={() => navigation.navigate('Settings')}
-          style={styles.accountRow}
+          accessibilityLabel={guestMode ? 'Leave guest mode' : 'Sign out'}
+          onPress={() => showModal(guestMode ? 'Leave guest mode' : 'Sign out', guestMode ? 'Return to the sign-in screen? Local guest data will remain on this device.' : 'Sign out of this device?', [{ text: 'Cancel', style: 'cancel' }, { text: guestMode ? 'Continue' : 'Sign out', style: 'destructive', onPress: signOut }])}
+          style={styles.signOutButton}
         >
-          <View style={styles.rowIcon}><Ionicons name="notifications-outline" size={21} color={theme.colors.primary} /></View>
-          <View style={styles.rowCopy}><Text style={styles.rowTitle}>Notification controls</Text><Text style={styles.rowSubtitle}>Alerts, radius, and privacy</Text></View>
-          <Ionicons name="chevron-forward" size={18} color={theme.colors.textMuted} />
+          <Text style={styles.signOutText}>{guestMode ? 'Leave guest mode' : 'Sign out'}</Text>
         </Pressable>
-      </View>
-
-      <Pressable onPress={() => showModal(guestMode ? 'Leave guest mode' : 'Sign out', guestMode ? 'Return to the sign-in screen? Local guest data will remain on this device.' : 'Sign out of this device?', [{ text: 'Cancel', style: 'cancel' }, { text: guestMode ? 'Continue' : 'Sign out', style: 'destructive', onPress: signOut }])} style={styles.signOutButton}>
-        <Ionicons name="log-out-outline" size={18} color={theme.colors.error} />
-        <Text style={styles.signOutText}>{guestMode ? 'Leave guest mode' : 'Sign out'}</Text>
-      </Pressable>
-      <View style={styles.footerRow}>
-        <Text style={styles.version}>PARKOPTICON · V1.0.0</Text>
-        <Text style={styles.footerDivider}> · </Text>
-        <Pressable
-          accessibilityRole="link"
-          accessibilityLabel="Email Parkopticon support"
-          accessibilityHint="Opens an email with the Parkopticon subject prefix"
-          onPress={openSupportEmail}
-        >
-          <Text style={styles.supportFooterLink}>SUPPORT</Text>
-        </Pressable>
-      </View>
       </ScrollView>
 
       <Modal
@@ -552,10 +579,10 @@ export default function ProfileScreen({ navigation }) {
         onRequestClose={cancelLinkFlow}
       >
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.reauthKeyboard}>
-          <ScrollView style={styles.reauthScroll} contentContainerStyle={styles.reauthBackdrop} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+          <ScrollView style={styles.reauthScroll} contentContainerStyle={[styles.reauthBackdrop, { paddingTop: insets.top + 20, paddingBottom: insets.bottom + 20 }]} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
             <View style={styles.reauthCard}>
               <View style={styles.reauthIconWrap}>
-                <Ionicons name={linkFlow?.stage === 'reauthentication' ? 'shield-checkmark-outline' : 'link-outline'} size={24} color={theme.colors.primary} />
+                <Ionicons name={linkFlow?.stage === 'reauthentication' ? 'shield-checkmark-outline' : 'link-outline'} size={24} color={theme.colors.primaryDark} />
               </View>
               <Text style={styles.reauthTitle}>
                 {linkFlow?.stage === 'reauthentication' ? 'Confirm it’s you' : `Link ${socialProviderLabels[linkFlow?.targetProvider]}`}
@@ -641,14 +668,14 @@ export default function ProfileScreen({ navigation }) {
                 <View style={styles.reauthForm}>
                   {targetLinkLoading ? (
                     <View style={styles.reauthWorking}>
-                      <ActivityIndicator color={theme.colors.primary} size="small" />
+                      <ActivityIndicator color={theme.colors.primaryDark} size="small" />
                       <Text style={styles.reauthWorkingText}>Linking your account…</Text>
                     </View>
                   ) : linkFlow?.targetProvider === 'apple' ? (
                     <View style={styles.reauthAppleButtonWrap}>
                       <AppleAuthentication.AppleAuthenticationButton
                         buttonType={AppleAuthentication.AppleAuthenticationButtonType.CONTINUE}
-                        buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.BLACK}
+                        buttonStyle={(theme.dark ? AppleAuthentication.AppleAuthenticationButtonStyle.WHITE : AppleAuthentication.AppleAuthenticationButtonStyle.BLACK)}
                         cornerRadius={12}
                         onPress={completeLinkIdentity}
                         style={styles.reauthAppleButton}
@@ -685,103 +712,91 @@ export default function ProfileScreen({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme) => StyleSheet.create({
   container: { backgroundColor: theme.colors.background, flex: 1 },
-  content: { padding: theme.spacing.lg, paddingBottom: theme.spacing.xxl },
-  title: { color: theme.colors.text, fontSize: 27, fontWeight: '800' },
-  identityCard: { backgroundColor: '#102A36', borderRadius: 16, marginTop: theme.spacing.lg, padding: theme.spacing.lg, ...theme.shadows.medium },
-  identityTopRow: { alignItems: 'center', flexDirection: 'row' },
-  avatar: { alignItems: 'center', backgroundColor: '#DDF3F4', borderRadius: 26, height: 52, justifyContent: 'center', width: 52 },
-  avatarText: { color: theme.colors.primaryDark, fontSize: 16, fontWeight: '800', letterSpacing: 0.5 },
-  identityCopy: { flex: 1, marginLeft: theme.spacing.md },
-  userName: { color: theme.colors.white, fontSize: 17, fontWeight: '800' },
-  userEmail: { color: '#AFC3CA', fontSize: 12, marginTop: 3 },
-  memberBadge: { borderColor: '#55727C', borderRadius: 6, borderWidth: 1, paddingHorizontal: 8, paddingVertical: 5 },
-  memberBadgeText: { color: '#D3E4E7', fontSize: 9, fontWeight: '800', letterSpacing: 1 },
-  identityDivider: { backgroundColor: '#2B4651', height: 1, marginVertical: theme.spacing.md },
-  identityHint: { color: '#BBD0D5', fontSize: 12, lineHeight: 18 },
-  sectionLabel: { color: theme.colors.textMuted, fontSize: 10, fontWeight: '800', letterSpacing: 1.3, marginTop: theme.spacing.lg },
-  signInMethodsCard: { backgroundColor: theme.colors.white, borderColor: theme.colors.border.light, borderRadius: 14, borderWidth: 1, marginTop: theme.spacing.sm, overflow: 'hidden', paddingHorizontal: theme.spacing.md, ...theme.shadows.small },
-  signInMethodsIntro: { color: theme.colors.textSecondary, fontSize: 12, lineHeight: 17, paddingTop: theme.spacing.md, paddingBottom: theme.spacing.sm },
-  signInMethodRow: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', minHeight: 66 },
-  signInMethodLeading: { alignItems: 'center', flex: 1, flexDirection: 'row', marginRight: theme.spacing.sm },
-  signInMethodIcon: { alignItems: 'center', backgroundColor: theme.colors.background, borderRadius: 10, height: 38, justifyContent: 'center', width: 38 },
-  signInMethodCopy: { flex: 1, marginLeft: theme.spacing.sm },
-  signInMethodTitle: { color: theme.colors.text, fontSize: 14, fontWeight: '700' },
-  signInMethodStatus: { color: theme.colors.textMuted, fontSize: 11, marginTop: 3 },
-  connectedBadge: { alignItems: 'center', backgroundColor: theme.colors.primaryLight, borderRadius: 8, flexDirection: 'row', paddingHorizontal: 7, paddingVertical: 5 },
-  connectedBadgeText: { color: theme.colors.primaryDark, fontSize: 10, fontWeight: '800', marginLeft: 3 },
-  linkButton: { alignItems: 'center', borderColor: theme.colors.primary, borderRadius: 8, borderWidth: 1, justifyContent: 'center', minHeight: 34, minWidth: 58, paddingHorizontal: 10 },
-  linkButtonPressed: { backgroundColor: theme.colors.primaryLight },
-  linkButtonText: { color: theme.colors.primaryDark, fontSize: 12, fontWeight: '800' },
-  appleLinkButtonWrap: { height: 34, width: 114 },
-  appleLinkButton: { height: 34, width: 114 },
-  identityLoading: { alignItems: 'center', flexDirection: 'row', paddingVertical: theme.spacing.md },
-  identityLoadingText: { color: theme.colors.textSecondary, fontSize: 12, marginLeft: theme.spacing.sm },
-  identityError: { paddingBottom: theme.spacing.md },
-  identityErrorText: { color: theme.colors.textSecondary, fontSize: 12, lineHeight: 17 },
-  identityEmptyText: { color: theme.colors.textSecondary, fontSize: 12, lineHeight: 17, paddingBottom: theme.spacing.md },
+  content: { paddingHorizontal: theme.spacing.lg },
+  title: { color: theme.colors.text, fontSize: 32, fontWeight: '700', letterSpacing: -0.8, marginBottom: 24 },
+  identityCard: { alignItems: 'center', flexDirection: 'row', marginBottom: 22 },
+  avatar: { alignItems: 'center', backgroundColor: theme.colors.primaryLight, borderRadius: 28, height: 56, justifyContent: 'center', width: 56 },
+  avatarText: { color: theme.colors.primaryDark, fontSize: 20, fontWeight: '600' },
+  identityCopy: { flex: 1, marginLeft: 14 },
+  userName: { color: theme.colors.text, fontSize: 19, fontWeight: '600' },
+  userEmail: { color: theme.colors.textSecondary, fontSize: 13, lineHeight: 19, marginTop: 4 },
+  sectionHeading: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8, minHeight: 24 },
+  sectionLabel: { color: theme.colors.textSecondary, flexShrink: 1, fontSize: 13, fontWeight: '500', lineHeight: 19, marginLeft: 3 },
+  preferencesLabel: { marginBottom: 8, marginTop: 24 },
+  signInMethodsDetails: { borderTopColor: theme.colors.border.light, borderTopWidth: StyleSheet.hairlineWidth, paddingBottom: 8 },
+  signInMethodsIntro: { color: theme.colors.textSecondary, fontSize: 12, lineHeight: 18, paddingBottom: 8, paddingTop: 12 },
+  signInMethodRow: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', minHeight: 68, paddingVertical: 8 },
+  signInMethodLeading: { alignItems: 'center', flex: 1, flexDirection: 'row', marginRight: 8 },
+  signInMethodIcon: { alignItems: 'center', backgroundColor: theme.colors.surfaceSubtle, borderRadius: 11, height: 36, justifyContent: 'center', width: 36 },
+  signInMethodCopy: { flex: 1, marginLeft: 9 },
+  signInMethodTitle: { color: theme.colors.text, fontSize: 14, fontWeight: '500' },
+  signInMethodStatus: { color: theme.colors.textSecondary, fontSize: 12, lineHeight: 17, marginTop: 3 },
+  connectedBadge: { alignItems: 'center', flexDirection: 'row', paddingHorizontal: 4, paddingVertical: 8 },
+  connectedBadgeText: { color: theme.colors.textSecondary, fontSize: 12, fontWeight: '500', marginLeft: 4 },
+  linkButton: { alignItems: 'center', backgroundColor: theme.colors.primaryLight, borderRadius: 12, justifyContent: 'center', minHeight: 44, minWidth: 62, paddingHorizontal: 12 },
+  linkButtonPressed: { opacity: 0.72 },
+  linkButtonText: { color: theme.colors.primaryDark, fontSize: 13, fontWeight: '600' },
+  appleLinkButtonWrap: { height: 44, width: 114 },
+  appleLinkButton: { height: 44, width: 114 },
+  identityLoading: { alignItems: 'center', flexDirection: 'row', paddingVertical: 16 },
+  identityLoadingText: { color: theme.colors.textSecondary, flex: 1, fontSize: 12, marginLeft: 8 },
+  identityError: { paddingBottom: 8 },
+  identityErrorText: { color: theme.colors.textSecondary, fontSize: 12, lineHeight: 18 },
+  identityEmptyText: { color: theme.colors.textSecondary, fontSize: 12, lineHeight: 18, paddingBottom: 12 },
   reauthKeyboard: { flex: 1 },
   reauthScroll: { flex: 1 },
-  reauthBackdrop: { alignItems: 'center', backgroundColor: 'rgba(18,35,45,0.48)', flexGrow: 1, justifyContent: 'center', padding: theme.spacing.lg },
-  reauthCard: { backgroundColor: theme.colors.surface, borderColor: theme.colors.border.light, borderRadius: theme.borderRadius.lg, borderWidth: 1, maxWidth: 390, padding: theme.spacing.lg, width: '100%', ...theme.shadows.large },
+  reauthBackdrop: { alignItems: 'center', backgroundColor: theme.colors.backdrop, flexGrow: 1, justifyContent: 'center', paddingHorizontal: theme.spacing.lg },
+  reauthCard: { backgroundColor: theme.colors.surface, borderRadius: 28, maxWidth: 390, padding: 22, width: '100%', ...theme.shadows.large },
   reauthIconWrap: { alignItems: 'center', alignSelf: 'center', backgroundColor: theme.colors.primaryLight, borderRadius: 24, height: 48, justifyContent: 'center', width: 48 },
-  reauthTitle: { color: theme.colors.text, fontSize: 19, fontWeight: '800', marginTop: theme.spacing.md, textAlign: 'center' },
-  reauthText: { color: theme.colors.textSecondary, fontSize: 13, lineHeight: 19, marginTop: theme.spacing.xs, textAlign: 'center' },
-  reauthForm: { marginTop: theme.spacing.lg },
-  reauthInput: { marginBottom: theme.spacing.sm },
-  reauthPrimaryButton: { marginTop: theme.spacing.xs },
-  reauthAlternative: { marginTop: theme.spacing.md },
-  reauthDivider: { alignItems: 'center', flexDirection: 'row', marginBottom: theme.spacing.sm },
-  reauthDividerLine: { backgroundColor: theme.colors.border.light, flex: 1, height: 1 },
-  reauthDividerText: { color: theme.colors.textMuted, fontSize: 10, fontWeight: '800', letterSpacing: 1, marginHorizontal: theme.spacing.sm },
-  reauthAlternativeText: { color: theme.colors.textSecondary, fontSize: 12, lineHeight: 17, marginBottom: theme.spacing.sm, textAlign: 'center' },
-  reauthMethodText: { color: theme.colors.textSecondary, fontSize: 13, lineHeight: 19, marginBottom: theme.spacing.md },
-  reauthGoogleButton: { alignItems: 'center', backgroundColor: theme.colors.white, borderColor: theme.colors.border.medium, borderRadius: 12, borderWidth: 1, flexDirection: 'row', height: 50, justifyContent: 'center', paddingHorizontal: theme.spacing.md },
-  reauthGoogleButtonPressed: { opacity: 0.82 },
-  reauthGoogleButtonText: { color: theme.colors.text, fontSize: 14, fontWeight: '700', marginLeft: 10 },
+  reauthTitle: { color: theme.colors.text, fontSize: 22, fontWeight: '600', marginTop: 16, textAlign: 'center' },
+  reauthText: { color: theme.colors.textSecondary, fontSize: 13, lineHeight: 20, marginTop: 7, textAlign: 'center' },
+  reauthForm: { marginTop: 20 },
+  reauthInput: { marginBottom: 8 },
+  reauthPrimaryButton: { marginTop: 4 },
+  reauthAlternative: { marginTop: 16 },
+  reauthDivider: { alignItems: 'center', flexDirection: 'row', marginBottom: 10 },
+  reauthDividerLine: { backgroundColor: theme.colors.border.light, flex: 1, height: StyleSheet.hairlineWidth },
+  reauthDividerText: { color: theme.colors.textSecondary, fontSize: 12, fontWeight: '500', marginHorizontal: 8 },
+  reauthAlternativeText: { color: theme.colors.textSecondary, fontSize: 12, lineHeight: 18, marginBottom: 10, textAlign: 'center' },
+  reauthMethodText: { color: theme.colors.textSecondary, fontSize: 13, lineHeight: 19, marginBottom: 16 },
+  reauthGoogleButton: { alignItems: 'center', backgroundColor: theme.colors.surface, borderColor: theme.colors.border.medium, borderRadius: 16, borderWidth: 1, flexDirection: 'row', minHeight: 50, justifyContent: 'center', paddingHorizontal: 16 },
+  reauthGoogleButtonPressed: { opacity: 0.76 },
+  reauthGoogleButtonText: { color: theme.colors.text, fontSize: 14, fontWeight: '600', marginLeft: 10 },
   reauthAppleButtonWrap: { height: 50 },
   reauthAppleButton: { height: 50, width: '100%' },
-  reauthProviderSpacer: { marginTop: theme.spacing.sm },
-  reauthWorking: { alignItems: 'center', backgroundColor: theme.colors.primaryLight, borderRadius: 12, flexDirection: 'row', justifyContent: 'center', minHeight: 50, paddingHorizontal: theme.spacing.md },
-  reauthWorkingText: { color: theme.colors.primaryDark, fontSize: 13, fontWeight: '700', marginLeft: theme.spacing.sm },
+  reauthProviderSpacer: { marginTop: 8 },
+  reauthWorking: { alignItems: 'center', backgroundColor: theme.colors.primaryLight, borderRadius: 16, flexDirection: 'row', justifyContent: 'center', minHeight: 50, paddingHorizontal: 16 },
+  reauthWorkingText: { color: theme.colors.primaryDark, fontSize: 13, fontWeight: '500', marginLeft: 8 },
   reauthUnavailableText: { color: theme.colors.textSecondary, fontSize: 13, lineHeight: 19 },
-  reauthError: { color: theme.colors.error, fontSize: 12, lineHeight: 17, marginTop: theme.spacing.md, textAlign: 'center' },
-  reauthCancel: { alignItems: 'center', marginTop: theme.spacing.md, minHeight: 38, justifyContent: 'center' },
+  reauthError: { color: theme.colors.error, fontSize: 12, lineHeight: 18, marginTop: 16, textAlign: 'center' },
+  reauthCancel: { alignItems: 'center', marginTop: 12, minHeight: 44, justifyContent: 'center' },
   reauthCancelDisabled: { opacity: 0.45 },
   reauthCancelPressed: { opacity: 0.72 },
-  reauthCancelText: { color: theme.colors.textSecondary, fontSize: 13, fontWeight: '700' },
-  impactIntro: { color: theme.colors.textSecondary, fontSize: 12, lineHeight: 18, marginTop: theme.spacing.xs },
-  impactSyncWarning: { color: theme.colors.warning, fontSize: 11, lineHeight: 16, marginTop: 4 },
-  statsCard: { backgroundColor: theme.colors.white, borderColor: theme.colors.border.light, borderRadius: 14, borderWidth: 1, flexDirection: 'row', flexWrap: 'wrap', marginTop: theme.spacing.sm, overflow: 'hidden', ...theme.shadows.small },
-  stat: { minHeight: 112, paddingHorizontal: theme.spacing.md, paddingVertical: theme.spacing.md, width: '50%' },
-  statRightBorder: { borderRightColor: theme.colors.border.light, borderRightWidth: 1 },
-  statTopBorder: { borderTopColor: theme.colors.border.light, borderTopWidth: 1 },
-  statHeading: { alignItems: 'center', flexDirection: 'row' },
-  statValue: { color: theme.colors.primaryDark, fontSize: 21, fontWeight: '800', marginLeft: 6 },
-  statLabel: { color: theme.colors.text, fontSize: 11, fontWeight: '800', marginTop: 7 },
-  statDetail: { color: theme.colors.textMuted, fontSize: 10, lineHeight: 14, marginTop: 3 },
-  impactHelp: { alignItems: 'center', alignSelf: 'flex-start', flexDirection: 'row', marginTop: theme.spacing.sm, paddingVertical: 4 },
-  impactHelpText: { color: theme.colors.primary, fontSize: 12, fontWeight: '700', marginLeft: 5 },
-  impactStatusCard: { alignItems: 'center', backgroundColor: theme.colors.white, borderColor: theme.colors.border.light, borderRadius: 14, borderWidth: 1, flexDirection: 'row', marginTop: theme.spacing.sm, padding: theme.spacing.md, ...theme.shadows.small },
-  impactStatusIcon: { alignItems: 'center', backgroundColor: theme.colors.primaryLight, borderRadius: 18, height: 36, justifyContent: 'center', marginRight: theme.spacing.sm, width: 36 },
+  reauthCancelText: { color: theme.colors.textSecondary, fontSize: 14, fontWeight: '500' },
+  impactSyncWarning: { color: theme.colors.warning, fontSize: 12, lineHeight: 18, marginBottom: 8 },
+  statsCard: { backgroundColor: theme.colors.surface, borderRadius: 22, flexDirection: 'row', flexWrap: 'wrap', overflow: 'hidden', paddingVertical: 8 },
+  stat: { justifyContent: 'center', minHeight: 80, paddingHorizontal: 18, paddingVertical: 10, width: '50%' },
+  statRightBorder: { borderRightColor: theme.colors.border.light, borderRightWidth: StyleSheet.hairlineWidth },
+  statValue: { color: theme.colors.text, fontSize: 27, fontWeight: '600', letterSpacing: -0.6 },
+  statLabel: { color: theme.colors.textSecondary, fontSize: 12, lineHeight: 17, marginTop: 4 },
+  impactHelp: { alignItems: 'center', justifyContent: 'center', minHeight: 44, paddingHorizontal: 5 },
+  impactHelpText: { color: theme.colors.primaryDark, fontSize: 12, fontWeight: '500' },
+  impactStatusCard: { alignItems: 'center', backgroundColor: theme.colors.surface, borderRadius: 20, flexDirection: 'row', padding: 17 },
+  impactStatusIcon: { alignItems: 'center', backgroundColor: theme.colors.primaryLight, borderRadius: 18, height: 36, justifyContent: 'center', marginRight: 10, width: 36 },
   impactStatusCopy: { flex: 1 },
-  impactStatusTitle: { color: theme.colors.text, fontSize: 13, fontWeight: '800' },
-  impactStatusText: { color: theme.colors.textSecondary, fontSize: 12, lineHeight: 17, marginTop: 3 },
-  impactLoadingText: { color: theme.colors.textSecondary, fontSize: 13, marginLeft: theme.spacing.sm },
-  retryButton: { alignSelf: 'flex-start', marginTop: theme.spacing.sm, paddingVertical: 2 },
-  retryButtonText: { color: theme.colors.primary, fontSize: 12, fontWeight: '800' },
-  card: { backgroundColor: theme.colors.white, borderColor: theme.colors.border.light, borderRadius: 14, borderWidth: 1, marginTop: theme.spacing.sm, paddingHorizontal: theme.spacing.md, ...theme.shadows.small },
-  rowBorder: { borderTopColor: theme.colors.border.light, borderTopWidth: 1 },
-  accountRow: { alignItems: 'center', flexDirection: 'row', minHeight: 68 },
-  rowIcon: { alignItems: 'center', backgroundColor: theme.colors.primaryLight, borderRadius: 10, height: 38, justifyContent: 'center', width: 38 },
-  rowCopy: { flex: 1, marginLeft: theme.spacing.sm },
-  rowTitle: { color: theme.colors.text, fontSize: 14, fontWeight: '700' },
-  rowSubtitle: { color: theme.colors.textMuted, fontSize: 12, marginTop: 3 },
-  signOutButton: { alignItems: 'center', alignSelf: 'center', flexDirection: 'row', marginTop: theme.spacing.xl, padding: theme.spacing.sm },
-  signOutText: { color: theme.colors.error, fontSize: 13, fontWeight: '700', marginLeft: 7 },
-  footerRow: { alignItems: 'center', flexDirection: 'row', justifyContent: 'center', marginTop: theme.spacing.sm },
-  version: { color: theme.colors.textMuted, fontSize: 10, letterSpacing: 1 },
-  footerDivider: { color: theme.colors.textMuted, fontSize: 10, letterSpacing: 1 },
-  supportFooterLink: { color: theme.colors.primary, fontSize: 10, letterSpacing: 1 },
+  impactStatusTitle: { color: theme.colors.text, fontSize: 14, fontWeight: '600' },
+  impactStatusText: { color: theme.colors.textSecondary, fontSize: 12, lineHeight: 18, marginTop: 4 },
+  impactLoadingText: { color: theme.colors.textSecondary, flex: 1, fontSize: 13, marginLeft: 10 },
+  retryButton: { alignSelf: 'flex-start', justifyContent: 'center', minHeight: 44, paddingHorizontal: 4 },
+  retryButtonText: { color: theme.colors.primaryDark, fontSize: 13, fontWeight: '600' },
+  card: { backgroundColor: theme.colors.surface, borderRadius: 20, overflow: 'hidden', paddingHorizontal: 15 },
+  rowBorder: { borderTopColor: theme.colors.border.light, borderTopWidth: StyleSheet.hairlineWidth },
+  accountRow: { alignItems: 'center', flexDirection: 'row', minHeight: 57, paddingVertical: 10 },
+  rowCopy: { flex: 1, marginHorizontal: 12 },
+  rowTitle: { color: theme.colors.text, fontSize: 15, fontWeight: '400', lineHeight: 21 },
+  rowSubtitle: { color: theme.colors.textSecondary, fontSize: 12, lineHeight: 18, marginTop: 3 },
+  signOutButton: { alignItems: 'center', alignSelf: 'center', justifyContent: 'center', marginTop: 22, minHeight: 44, minWidth: 100, paddingHorizontal: 12 },
+  signOutText: { color: theme.colors.error, fontSize: 15, fontWeight: '500' },
 });

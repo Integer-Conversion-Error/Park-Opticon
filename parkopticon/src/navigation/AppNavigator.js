@@ -1,10 +1,11 @@
 import React from 'react';
-import { NavigationContainer } from '@react-navigation/native';
+import { DarkTheme, DefaultTheme, NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { Ionicons } from '@expo/vector-icons';
+import { useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { theme } from '../theme';
+import { useAppTheme } from '../theme';
+import FloatingTabBar, { getFloatingTabBarHeight } from './FloatingTabBar';
 
 import MapScreen from '../screens/MapScreen';
 import ProfileScreen from '../screens/ProfileScreen';
@@ -19,38 +20,26 @@ import { clearGuestMode, getGuestMode, setGuestMode as persistGuestMode } from '
 const RootStack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
-const tabIcons = {
-  Map: ['map', 'map-outline'],
-  Account: ['person-circle', 'person-circle-outline'],
-};
-
 function MainTabs() {
   const insets = useSafeAreaInsets();
+  const { fontScale } = useWindowDimensions();
+  const theme = useAppTheme();
 
   return (
     <Tab.Navigator
       initialRouteName={process.env.EXPO_PUBLIC_AUTH_TEST_MODE === '1' ? 'Account' : 'Map'}
-      screenOptions={({ route }) => ({
+      tabBar={(props) => <FloatingTabBar {...props} />}
+      screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: theme.colors.primary,
-        tabBarInactiveTintColor: theme.colors.textMuted,
-        tabBarLabelStyle: { fontSize: 9, fontWeight: '700', marginBottom: 1 },
-        // Android edge-to-edge can place the system navigation bar over the
-        // app. Include the live safe-area inset in both the bar's height and
-        // bottom padding so the tab controls always stay above it.
+        sceneStyle: { backgroundColor: theme.colors.background },
+        // Reserve the complete control and system inset for screens that place
+        // content above the pill, while allowing the map to continue behind it.
         tabBarStyle: {
-          backgroundColor: theme.colors.white,
-          borderTopColor: theme.colors.border.light,
-          borderTopWidth: 1,
-          height: 68 + insets.bottom,
-          paddingBottom: 7 + insets.bottom,
-          paddingTop: 6,
+          position: 'absolute',
+          height: getFloatingTabBarHeight(insets.bottom, fontScale),
+          paddingBottom: insets.bottom + 8,
         },
-        tabBarIcon: ({ focused, color, size }) => {
-          const [activeIcon, inactiveIcon] = tabIcons[route.name] || ['ellipse', 'ellipse-outline'];
-          return <Ionicons name={focused ? activeIcon : inactiveIcon} color={color} size={Math.min(size, 21)} />;
-        },
-      })}
+      }}
     >
       <Tab.Screen name="Map" component={MapScreen} options={{ headerShown: false, title: 'Map' }} />
       <Tab.Screen name="Account" component={ProfileScreen} options={{ title: 'Account' }} />
@@ -59,6 +48,7 @@ function MainTabs() {
 }
 
 export default function AppNavigator() {
+  const theme = useAppTheme();
   const [authChecked, setAuthChecked] = React.useState(!apiConfigured);
   // A missing backend is a configuration error, not an authenticated session.
   const [authenticated, setAuthenticated] = React.useState(false);
@@ -118,12 +108,23 @@ export default function AppNavigator() {
   }
 
   return (
-    <NavigationContainer>
+    <NavigationContainer theme={{
+      ...(theme.dark ? DarkTheme : DefaultTheme),
+      colors: {
+        ...(theme.dark ? DarkTheme.colors : DefaultTheme.colors),
+        background: theme.colors.background,
+        border: theme.colors.border.light,
+        card: theme.colors.surface,
+        primary: theme.colors.primaryDark,
+        text: theme.colors.text,
+      },
+    }}>
       <RootStack.Navigator
         screenOptions={{
-          headerStyle: { backgroundColor: theme.colors.primary },
-          headerTintColor: theme.colors.white,
-          headerTitleStyle: { fontWeight: '700' },
+          contentStyle: { backgroundColor: theme.colors.background },
+          headerStyle: { backgroundColor: theme.colors.background },
+          headerTintColor: theme.colors.primaryDark,
+          headerTitleStyle: { color: theme.colors.text, fontWeight: '600' },
         }}
       >
         <RootStack.Screen
@@ -144,8 +145,6 @@ export default function AppNavigator() {
             contentStyle: { backgroundColor: 'transparent' },
             headerShown: false,
             presentation: 'transparentModal',
-            statusBarColor: 'transparent',
-            statusBarTranslucent: true,
           }}
         />
       </RootStack.Navigator>
