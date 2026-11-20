@@ -1,5 +1,5 @@
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
-import { theme } from '../theme';
+import { useThemedStyles } from '../theme';
 
 export const Button = ({
   title,
@@ -13,8 +13,9 @@ export const Button = ({
   style,
   textStyle,
 }) => {
-  const isQuiet = variant === 'outline' || variant === 'text';
-  const spinnerColor = isQuiet ? theme.colors.primary : theme.colors.white;
+  const { theme, styles } = useThemedStyles(createStyles);
+  const isQuiet = variant === 'outline' || variant === 'text' || variant === 'secondary';
+  const spinnerColor = isQuiet ? theme.colors.primaryDark : theme.colors.white;
 
   return (
     <Pressable
@@ -43,26 +44,26 @@ export const Button = ({
   );
 };
 
-const styles = StyleSheet.create({
-  button: { alignItems: 'center', borderRadius: 12, justifyContent: 'center', overflow: 'hidden' },
-  button_small: { minHeight: 38, paddingHorizontal: 14 },
-  button_medium: { minHeight: 46, paddingHorizontal: 18 },
+const createStyles = (theme) => StyleSheet.create({
+  button: { alignItems: 'center', borderRadius: 16, justifyContent: 'center', overflow: 'hidden' },
+  button_small: { minHeight: 44, paddingHorizontal: 14 },
+  button_medium: { minHeight: 50, paddingHorizontal: 18 },
   button_large: { minHeight: 56, paddingHorizontal: 22 },
-  content: { alignItems: 'center', flexDirection: 'row', justifyContent: 'center' },
+  content: { alignItems: 'center', flexDirection: 'row', justifyContent: 'center', maxWidth: '100%' },
   icon: { marginRight: 8 },
-  primary: { backgroundColor: theme.colors.primary, ...theme.shadows.medium },
-  secondary: { backgroundColor: theme.colors.success, ...theme.shadows.medium },
-  danger: { backgroundColor: theme.colors.error, ...theme.shadows.medium },
+  primary: { backgroundColor: theme.colors.primary },
+  secondary: { backgroundColor: theme.colors.primaryLight },
+  danger: { backgroundColor: theme.colors.dangerBackground },
   outline: { backgroundColor: theme.colors.surface, borderColor: theme.colors.border.medium, borderWidth: 1 },
   text: { backgroundColor: 'transparent' },
   primaryText: { color: theme.colors.white },
-  secondaryText: { color: theme.colors.white },
+  secondaryText: { color: theme.colors.primaryDark },
   dangerText: { color: theme.colors.white },
   outlineText: { color: theme.colors.primaryDark },
   textText: { color: theme.colors.primaryDark },
-  buttonText: { fontWeight: '700', textAlign: 'center' },
+  buttonText: { flexShrink: 1, fontWeight: '600', textAlign: 'center' },
   text_small: { fontSize: 13 },
-  text_medium: { fontSize: 14 },
+  text_medium: { fontSize: 15 },
   text_large: { fontSize: 16 },
   fullWidth: { width: '100%' },
   pressed: { opacity: 0.86, transform: [{ scale: 0.985 }] },

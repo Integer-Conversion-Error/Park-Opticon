@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button } from '../components';
-import { theme } from '../theme';
+import { useThemedStyles } from '../theme';
 import { appendReport } from '../services/localStore';
 import { api, apiAvailable } from '../services/api';
 import { getFastLocation } from '../services/locationService';
@@ -11,8 +11,8 @@ import { getFastLocation } from '../services/locationService';
 const MAX_REPORT_ACCURACY_METERS = 50;
 
 const REPORT_TYPES = [
-  { value: 'chalking', icon: 'create-outline', title: 'Chalking', color: theme.colors.secondary },
-  { value: 'ticketing', icon: 'ticket-outline', title: 'Ticketing', color: theme.colors.error },
+  { value: 'chalking', icon: 'create-outline', title: 'Chalking', colorKey: 'secondaryDark' },
+  { value: 'ticketing', icon: 'ticket-outline', title: 'Ticketing', colorKey: 'error' },
 ];
 
 const toReportLocation = (position) => ({
@@ -26,6 +26,7 @@ const isAccurateEnough = (location) => (
 );
 
 export default function ReportEnforcementScreen({ navigation, route }) {
+  const { theme, styles } = useThemedStyles(createStyles);
   const insets = useSafeAreaInsets();
   const passedLocation = route?.params?.location;
   const [selectedType, setSelectedType] = useState(null);
@@ -110,23 +111,21 @@ export default function ReportEnforcementScreen({ navigation, route }) {
         style={StyleSheet.absoluteFill}
       />
 
-      <View accessibilityViewIsModal style={[styles.sheet, { marginBottom: insets.bottom + theme.spacing.md }]}>
+      <View accessibilityViewIsModal style={[styles.sheet, { marginBottom: insets.bottom + 8 }]}>
         <View style={styles.handle} />
         <View style={styles.header}>
-          <View>
-            <Text style={styles.title}>Report enforcement</Text>
-          </View>
+          <Text accessibilityRole="header" style={styles.title}>Report enforcement</Text>
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Close report enforcement"
             onPress={() => navigation.goBack()}
             style={styles.closeButton}
           >
-            <Ionicons name="close" size={18} color={theme.colors.textSecondary} />
+            <View style={styles.closeButtonIcon}><Ionicons name="close" size={18} color={theme.colors.textSecondary} /></View>
           </Pressable>
         </View>
 
-        <View style={styles.typeGrid}>
+        <View accessibilityRole="radiogroup" accessibilityLabel="Enforcement type" style={styles.typeGrid}>
           {REPORT_TYPES.map((type) => {
             const selected = selectedType === type.value;
             return (
@@ -135,15 +134,15 @@ export default function ReportEnforcementScreen({ navigation, route }) {
                 accessibilityRole="radio"
                 accessibilityLabel={`${type.title} enforcement activity`}
                 accessibilityHint="Selects this report type"
-                accessibilityState={{ selected }}
+                accessibilityState={{ selected, checked: selected }}
                 onPress={() => { setSelectedType(type.value); setSubmitError(''); }}
                 style={[styles.typeCard, selected && styles.typeCardSelected]}
               >
-                <View style={[styles.typeIcon, { backgroundColor: selected ? `${type.color}20` : theme.colors.surfaceSubtle }]}>
-                  <Ionicons name={type.icon} size={25} color={selected ? type.color : theme.colors.textSecondary} />
+                <View style={styles.typeIcon}>
+                  <Ionicons name={type.icon} size={26} color={theme.colors[type.colorKey]} />
                 </View>
                 <Text style={[styles.typeLabel, selected && styles.typeLabelSelected]}>{type.title}</Text>
-                {selected ? <Ionicons name="checkmark-circle" size={17} color={type.color} style={styles.typeCheck} /> : null}
+                <Ionicons name={selected ? 'radio-button-on' : 'radio-button-off'} size={18} color={selected ? theme.colors.primaryDark : theme.colors.textSecondary} style={styles.typeCheck} />
               </Pressable>
             );
           })}
@@ -166,20 +165,21 @@ export default function ReportEnforcementScreen({ navigation, route }) {
   );
 }
 
-const styles = StyleSheet.create({
-  backdrop: { backgroundColor: 'rgba(18,35,45,0.18)', flex: 1, justifyContent: 'flex-end' },
-  sheet: { backgroundColor: theme.colors.surface, borderColor: theme.colors.border.light, borderRadius: 20, borderWidth: 1, marginHorizontal: theme.spacing.md, padding: 12, ...theme.shadows.large },
-  handle: { alignSelf: 'center', backgroundColor: theme.colors.border.medium, borderRadius: 2, height: 4, marginBottom: 6, width: 28 },
-  header: { alignItems: 'flex-start', flexDirection: 'row', justifyContent: 'space-between' },
-  title: { color: theme.colors.text, fontSize: 17, fontWeight: '800' },
+const createStyles = (theme) => StyleSheet.create({
+  backdrop: { backgroundColor: theme.colors.backdrop, flex: 1, justifyContent: 'flex-end' },
+  sheet: { backgroundColor: theme.colors.surface, borderRadius: 30, marginHorizontal: 9, paddingHorizontal: 18, paddingTop: 10, paddingBottom: 18, ...theme.shadows.large },
+  handle: { alignSelf: 'center', backgroundColor: theme.colors.border.medium, borderRadius: 2, height: 4, marginBottom: 10, width: 32 },
+  header: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', marginBottom: 15 },
+  title: { color: theme.colors.text, flex: 1, fontSize: 21, fontWeight: '600', lineHeight: 27, letterSpacing: -0.4 },
   closeButton: { alignItems: 'center', borderRadius: 22, height: 44, justifyContent: 'center', marginLeft: 4, width: 44 },
-  typeGrid: { flexDirection: 'row', gap: 6, marginTop: 10 },
-  typeCard: { alignItems: 'center', backgroundColor: theme.colors.surface, borderColor: theme.colors.border.light, borderRadius: 12, borderWidth: 1, flex: 1, minHeight: 84, justifyContent: 'center', padding: 6 },
-  typeCardSelected: { borderColor: theme.colors.primary, borderWidth: 2 },
-  typeIcon: { alignItems: 'center', borderRadius: 12, height: 38, justifyContent: 'center', width: 38 },
-  typeLabel: { color: theme.colors.text, fontSize: 14, fontWeight: '800', marginTop: 3 },
-  typeLabelSelected: { color: theme.colors.primaryDark },
-  typeCheck: { marginTop: 1 },
-  error: { color: theme.colors.error, fontSize: 12, lineHeight: 17, marginTop: 6, textAlign: 'center' },
-  submitButton: { borderRadius: 14, marginTop: 10, minHeight: 50 },
+  closeButtonIcon: { alignItems: 'center', backgroundColor: theme.colors.surfaceSubtle, borderRadius: 14, height: 28, justifyContent: 'center', width: 28 },
+  typeGrid: { flexDirection: 'row', gap: 10 },
+  typeCard: { alignItems: 'center', backgroundColor: theme.colors.surface, borderColor: theme.colors.border.light, borderRadius: 18, borderWidth: 1.5, flex: 1, minHeight: 100, justifyContent: 'center', padding: 12 },
+  typeCardSelected: { backgroundColor: theme.colors.primaryLight, borderColor: theme.colors.primaryDark },
+  typeIcon: { alignItems: 'center', height: 32, justifyContent: 'center', width: 32 },
+  typeLabel: { color: theme.colors.text, fontSize: 15, fontWeight: '600', marginTop: 10 },
+  typeLabelSelected: { color: theme.colors.text },
+  typeCheck: { position: 'absolute', right: 10, top: 10 },
+  error: { color: theme.colors.error, fontSize: 12, lineHeight: 18, marginTop: 12, textAlign: 'center' },
+  submitButton: { borderRadius: 16, marginTop: 16, minHeight: 50 },
 });

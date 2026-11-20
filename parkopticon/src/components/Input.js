@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { View, TextInput, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { theme } from '../theme';
+import { useThemedStyles } from '../theme';
 
 /**
  * Input Component
@@ -25,6 +25,7 @@ export const Input = ({
   disabled = false,
   ...props
 }) => {
+  const { theme, styles } = useThemedStyles(createStyles);
   const [isFocused, setIsFocused] = useState(false);
 
   return (
@@ -89,7 +90,7 @@ export const Input = ({
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (theme) => StyleSheet.create({
   container: {
     marginBottom: theme.spacing.md,
   },
@@ -102,15 +103,15 @@ const styles = StyleSheet.create({
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.surface,
     borderWidth: 1,
     borderColor: theme.colors.border.light,
-    borderRadius: 12,
+    borderRadius: 14,
     paddingHorizontal: theme.spacing.sm,
     minHeight: 48,
   },
   inputContainerFocused: {
-    borderColor: theme.colors.primary,
+    borderColor: theme.colors.primaryDark,
     borderWidth: 2,
   },
   inputContainerError: {
@@ -122,7 +123,7 @@ const styles = StyleSheet.create({
   },
   input: {
     flex: 1,
-    fontSize: 15,
+    fontSize: 16,
     color: theme.colors.text,
     paddingVertical: theme.spacing.sm,
   },
@@ -135,6 +136,10 @@ const styles = StyleSheet.create({
     marginRight: theme.spacing.xs,
   },
   rightIcon: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 44,
+    minWidth: 44,
     marginLeft: theme.spacing.xs,
     padding: theme.spacing.xs,
   },
