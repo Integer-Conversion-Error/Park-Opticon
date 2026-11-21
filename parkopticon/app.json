@@ -43,7 +43,8 @@
       "expo-secure-store",
       "expo-notifications",
       "expo-apple-authentication",
-      "expo-system-ui"
+      "expo-system-ui",
+      "./plugins/withMapMarkerLayout.cjs"
     ],
     "extra": {
       "eas": {

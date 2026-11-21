@@ -13,11 +13,12 @@ import {
 import { useIsFocused } from '@react-navigation/native';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
-import MapView, { Marker } from 'react-native-maps';
+import MapView from 'react-native-maps';
 import * as Location from 'expo-location';
 import Constants from 'expo-constants';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button } from '../components';
+import ReportMarker from '../components/ReportMarker';
 import { useThemedStyles } from '../theme';
 import {
   DEFAULT_SETTINGS,
@@ -276,7 +277,7 @@ function ReadyMapScreen({ navigation }) {
   const mapRef = useRef(null);
   const insets = useSafeAreaInsets();
   const tabBarHeight = useBottomTabBarHeight();
-  const [bottomCardHeight, setBottomCardHeight] = useState(80);
+  const [bottomCardLayout, setBottomCardLayout] = useState({ height: 80, reportId: null });
   const [topOverlayHeight, setTopOverlayHeight] = useState(0);
   const mapStyle = useMemo(() => theme.dark ? [
     { elementType: 'geometry', stylers: [{ color: theme.colors.mapBackground }] },
@@ -300,6 +301,7 @@ function ReadyMapScreen({ navigation }) {
   const [isUnparking, setIsUnparking] = useState(false);
   const [alertsReady, setAlertsReady] = useState(false);
   const [selectedReportId, setSelectedReportId] = useState(null);
+  const [pendingReportFocus, setPendingReportFocus] = useState(null);
   const [reportsModalVisible, setReportsModalVisible] = useState(false);
   const [verificationMessage, setVerificationMessage] = useState('');
   const [syncError, setSyncError] = useState(() => (
@@ -624,17 +626,34 @@ function ReadyMapScreen({ navigation }) {
   };
 
   const focusReportOnMap = useCallback((report) => {
-    const currentRegion = currentRegionRef.current || FALLBACK_REGION;
     setSelectedReportId(report.id);
     setVerificationMessage('');
-    // Google Maps centers within mapPadding already. MapKit still needs the
-    // northward visual offset. Updating only center keeps zoom/heading/pitch.
-    const latitudeOffset = Platform.OS === 'android' ? 0 : currentRegion.latitudeDelta * REPORT_FOCUS_TOP_HALF_OFFSET;
-    mapRef.current?.animateCamera({
-      center: { latitude: report.latitude - latitudeOffset, longitude: report.longitude },
-    }, { duration: 450 });
+    setPendingReportFocus(report);
     setReportsModalVisible(false);
   }, []);
+
+  useEffect(() => {
+    if (!pendingReportFocus) return undefined;
+    if (selectedReport?.id !== pendingReportFocus.id) {
+      setPendingReportFocus(null);
+      return undefined;
+    }
+    if (reportsModalVisible
+      || bottomCardLayout.reportId !== pendingReportFocus.id
+      || bottomCardLayout.height <= 0) return undefined;
+
+    // Changing native map padding moves the camera and cancels its animation.
+    // Wait for the selected card's measured padding to commit before focusing.
+    const frame = requestAnimationFrame(() => {
+      const currentRegion = currentRegionRef.current || FALLBACK_REGION;
+      const latitudeOffset = Platform.OS === 'android' ? 0 : currentRegion.latitudeDelta * REPORT_FOCUS_TOP_HALF_OFFSET;
+      mapRef.current?.animateCamera({
+        center: { latitude: pendingReportFocus.latitude - latitudeOffset, longitude: pendingReportFocus.longitude },
+      }, { duration: 450 });
+      setPendingReportFocus(null);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [bottomCardLayout, pendingReportFocus, reportsModalVisible, selectedReport]);
 
   const parkedMinutes = parkingSession
     ? Math.max(0, Math.floor((now - new Date(parkingSession.startedAt).getTime()) / 60000))
@@ -686,7 +705,7 @@ function ReadyMapScreen({ navigation }) {
         initialRegion={FALLBACK_REGION}
         userInterfaceStyle={theme.dark ? 'dark' : 'light'}
         customMapStyle={Platform.OS === 'android' ? mapStyle : undefined}
-        mapPadding={{ top: insets.top + 15 + topOverlayHeight + 12, right: 10, bottom: tabBarHeight + bottomCardHeight + 24, left: 10 }}
+        mapPadding={{ top: insets.top + 15 + topOverlayHeight + 12, right: 10, bottom: tabBarHeight + bottomCardLayout.height + 24, left: 10 }}
         onRegionChangeComplete={(region) => { currentRegionRef.current = region; }}
         showsUserLocation={Boolean(location)}
         showsMyLocationButton
@@ -694,26 +713,16 @@ function ReadyMapScreen({ navigation }) {
         onPress={() => setSelectedReportId(null)}
       >
         {visibleReports.map((report) => {
-          const meta = getReportMeta(report);
           const isStale = getParkingSpotStatus(report, now) === 'stale';
           const isSelected = selectedReportId === report.id;
           return (
-            <Marker
+            <ReportMarker
               key={report.id}
-              coordinate={{ latitude: report.latitude, longitude: report.longitude }}
+              report={report}
+              isStale={isStale}
+              isSelected={isSelected}
               onPress={() => setSelectedReportId(report.id)}
-              tracksViewChanges={false}
-              accessible
-              accessibilityState={{ selected: isSelected }}
-              accessibilityLabel={`${isStale ? 'Stale open spot' : meta.label}, ${formatTimeAgo(report.createdAt)}. Double tap for details.`}
-              accessibilityHint="Opens report details and verification options"
-            >
-              <View style={styles.markerTarget}>
-                <View style={[styles.marker, { backgroundColor: isStale ? theme.colors.textMuted : meta.color }, isSelected && styles.markerSelected]}>
-                  <Ionicons name={meta.icon} size={16} color={theme.colors.white} />
-                </View>
-              </View>
-            </Marker>
+            />
           );
         })}
       </MapView>
@@ -750,7 +759,11 @@ function ReadyMapScreen({ navigation }) {
 
       {/* Keep actions and native map attribution above the floating tabs. */}
       <View
-        onLayout={({ nativeEvent }) => setBottomCardHeight(nativeEvent.layout.height)}
+        key={`${selectedReport?.id || 'parking'}-${reportsModalVisible ? 'hidden' : 'shown'}`}
+        onLayout={({ nativeEvent }) => setBottomCardLayout({
+          height: nativeEvent.layout.height,
+          reportId: selectedReport && !reportsModalVisible ? selectedReport.id : null,
+        })}
         style={[styles.bottomOverlay, { bottom: tabBarHeight + 10 }]}
       >
         {selectedReport && !reportsModalVisible ? (
@@ -859,9 +872,6 @@ const createStyles = (theme) => StyleSheet.create({
   nearbyReportCopy: { flex: 1, marginHorizontal: 12 },
   nearbyReportTitle: { color: theme.colors.text, fontSize: 15, fontWeight: '600' },
   nearbyReportMeta: { color: theme.colors.textSecondary, fontSize: 12, marginTop: 4 },
-  markerTarget: { alignItems: 'center', height: 44, justifyContent: 'center', width: 44 },
-  marker: { alignItems: 'center', borderColor: theme.colors.white, borderRadius: 18, borderWidth: 2, elevation: 3, height: 36, justifyContent: 'center', width: 36 },
-  markerSelected: { borderColor: theme.colors.primary, borderWidth: 3, transform: [{ scale: 1.12 }] },
   bottomOverlay: { left: 14, position: 'absolute', right: 14 },
   reportDetailCard: { backgroundColor: theme.colors.surface, borderRadius: 25, padding: 15, ...theme.shadows.large },
   reportDetailHeader: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
