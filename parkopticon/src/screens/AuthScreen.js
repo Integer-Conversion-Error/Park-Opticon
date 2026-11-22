@@ -4,12 +4,13 @@ import { Ionicons } from '@expo/vector-icons';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button, Input } from '../components';
-import { theme } from '../theme';
+import { useThemedStyles } from '../theme';
 import { api } from '../services/api';
 import { getSocialAuthPayload, isGoogleSignInSupported, isSocialAuthCancelled, socialProviderLabels } from '../services/socialAuth';
 import { useAppModal } from '../components/AppModal';
 
 export default function AuthScreen({ onAuthenticated, onGuest }) {
+  const { theme, styles } = useThemedStyles(createStyles);
   const insets = useSafeAreaInsets();
   const { showModal } = useAppModal();
   const [email, setEmail] = useState('');
@@ -78,8 +79,7 @@ export default function AuthScreen({ onAuthenticated, onGuest }) {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.header}>
-          <View style={styles.headerRule} />
-          <Text style={styles.eyebrow}>PARKOPTICON</Text>
+          <Text style={styles.eyebrow}>Park Opticon</Text>
           <Text style={styles.title}>{registering ? 'Join the community.' : 'Safer parking, together.'}</Text>
           <Text style={styles.subtitle}>
             {registering ? 'Create an account to sync reports, parking protection, and notifications.' : 'Sign in to sync reports, parking protection, and notifications securely.'}
@@ -144,7 +144,7 @@ export default function AuthScreen({ onAuthenticated, onGuest }) {
                 <View pointerEvents={loading || socialLoading ? 'none' : 'auto'} style={[styles.appleButtonWrap, (loading || socialLoading) && styles.socialButtonDisabled]}>
                   <AppleAuthentication.AppleAuthenticationButton
                     buttonType={AppleAuthentication.AppleAuthenticationButtonType.CONTINUE}
-                    buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.BLACK}
+                    buttonStyle={theme.dark ? AppleAuthentication.AppleAuthenticationButtonStyle.WHITE : AppleAuthentication.AppleAuthenticationButtonStyle.BLACK}
                     cornerRadius={12}
                     onPress={() => submitSocial('apple')}
                     style={styles.appleButton}
@@ -177,35 +177,34 @@ export default function AuthScreen({ onAuthenticated, onGuest }) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme) => StyleSheet.create({
   container: { backgroundColor: theme.colors.background, flex: 1 },
   content: { paddingHorizontal: theme.spacing.lg },
   header: { marginBottom: theme.spacing.lg },
-  headerRule: { backgroundColor: theme.colors.primary, borderRadius: 2, height: 4, marginBottom: theme.spacing.md, width: 32 },
-  eyebrow: { color: theme.colors.primary, fontSize: 10, fontWeight: '800', letterSpacing: 1.4 },
-  title: { color: theme.colors.text, fontSize: 27, fontWeight: '800', letterSpacing: -0.2, lineHeight: 33, marginTop: 4 },
+  eyebrow: { color: theme.colors.primaryDark, fontSize: 14, fontWeight: '600', marginBottom: 10 },
+  title: { color: theme.colors.text, fontSize: 32, fontWeight: '700', letterSpacing: -0.8, lineHeight: 38, marginTop: 4 },
   subtitle: { color: theme.colors.textSecondary, fontSize: 14, lineHeight: 20, marginTop: 5 },
-  card: { backgroundColor: theme.colors.surface, borderColor: theme.colors.border.light, borderRadius: theme.borderRadius.lg, borderWidth: 1, padding: theme.spacing.md, ...theme.shadows.small },
+  card: { backgroundColor: theme.colors.surface, borderRadius: 24, padding: theme.spacing.md },
   inputField: { marginBottom: theme.spacing.sm },
   submitButton: { marginTop: theme.spacing.xs },
   socialDivider: { alignItems: 'center', flexDirection: 'row', marginTop: theme.spacing.lg, marginBottom: theme.spacing.md },
   dividerLine: { backgroundColor: theme.colors.border.light, flex: 1, height: 1 },
-  dividerText: { color: theme.colors.textMuted, fontSize: 10, fontWeight: '800', letterSpacing: 1, marginHorizontal: theme.spacing.sm },
-  socialButton: { alignItems: 'center', backgroundColor: theme.colors.white, borderColor: theme.colors.border.medium, borderRadius: 12, borderWidth: 1, flexDirection: 'row', height: 50, justifyContent: 'center', paddingHorizontal: theme.spacing.md },
+  dividerText: { color: theme.colors.textMuted, fontSize: 12, fontWeight: '500', marginHorizontal: theme.spacing.sm },
+  socialButton: { alignItems: 'center', backgroundColor: theme.colors.surface, borderColor: theme.colors.border.medium, borderRadius: 16, borderWidth: 1, flexDirection: 'row', height: 50, justifyContent: 'center', paddingHorizontal: theme.spacing.md },
   socialButtonPressed: { opacity: 0.82 },
   socialButtonDisabled: { opacity: 0.48 },
-  socialButtonText: { color: theme.colors.text, fontSize: 14, fontWeight: '700', marginLeft: 10 },
+  socialButtonText: { color: theme.colors.text, fontSize: 14, fontWeight: '600', marginLeft: 10 },
   appleButtonWrap: { height: 50, marginTop: theme.spacing.sm },
   appleButton: { height: 50, width: '100%' },
-  switchButton: { alignItems: 'center', paddingHorizontal: theme.spacing.xs, paddingTop: theme.spacing.md },
+  switchButton: { alignItems: 'center', minHeight: 44, paddingHorizontal: theme.spacing.xs, paddingTop: theme.spacing.md },
   switchText: { color: theme.colors.textSecondary, fontSize: 13, lineHeight: 19, textAlign: 'center' },
-  switchTextStrong: { color: theme.colors.primary, fontWeight: '800' },
+  switchTextStrong: { color: theme.colors.primaryDark, fontWeight: '600' },
   privacyCard: { alignItems: 'center', backgroundColor: theme.colors.primaryLight, borderRadius: theme.borderRadius.md, flexDirection: 'row', marginTop: theme.spacing.md, padding: theme.spacing.md },
   privacyIcon: { alignItems: 'center', backgroundColor: theme.colors.surface, borderRadius: 10, height: 36, justifyContent: 'center', width: 36 },
   privacyCopy: { flex: 1, marginLeft: theme.spacing.sm },
-  privacyTitle: { color: theme.colors.primaryDark, fontSize: 13, fontWeight: '800' },
+  privacyTitle: { color: theme.colors.primaryDark, fontSize: 14, fontWeight: '600' },
   privacyText: { color: theme.colors.primaryDark, fontSize: 12, lineHeight: 17, marginTop: 2 },
   guestButton: { alignItems: 'center', paddingHorizontal: theme.spacing.sm, paddingVertical: theme.spacing.md },
-  guestButtonText: { color: theme.colors.textSecondary, fontSize: 14, fontWeight: '800' },
-  guestButtonHint: { color: theme.colors.textMuted, fontSize: 11, marginTop: 3 },
+  guestButtonText: { color: theme.colors.textSecondary, fontSize: 15, fontWeight: '600' },
+  guestButtonHint: { color: theme.colors.textMuted, fontSize: 12, marginTop: 3 },
 });

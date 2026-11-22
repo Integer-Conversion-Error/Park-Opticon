@@ -8,8 +8,8 @@ import {
   View,
 } from 'react-native';
 import { useIsFocused } from '@react-navigation/native';
-import { Ionicons } from '@expo/vector-icons';
-import { theme } from '../theme';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useThemedStyles } from '../theme';
 import {
   DEFAULT_SETTINGS,
   loadSettings,
@@ -32,6 +32,7 @@ function NotchedSlider({
   onValueChange,
   onSlidingComplete,
 }) {
+  const { styles } = useThemedStyles(createStyles);
   const [trackWidth, setTrackWidth] = useState(0);
   const selectedIndex = Math.max(0, options.indexOf(value));
   const progress = selectedIndex / (options.length - 1);
@@ -154,6 +155,8 @@ function NotchedSlider({
 }
 
 export default function SettingsScreen() {
+  const { theme, styles } = useThemedStyles(createStyles);
+  const insets = useSafeAreaInsets();
   const isFocused = useIsFocused();
   const [settings, setSettings] = useState(DEFAULT_SETTINGS);
 
@@ -205,54 +208,35 @@ export default function SettingsScreen() {
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <View style={styles.header}>
-        <View style={styles.headerRule} />
-        <Text style={styles.eyebrow}>YOUR CONTROL CENTER</Text>
-        <Text style={styles.title}>Settings</Text>
-        <Text style={styles.subtitle}>
-          Choose when Parkopticon should notify you and how far alerts can reach.
-        </Text>
-      </View>
-
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + theme.spacing.xl }]}
+      showsVerticalScrollIndicator={false}
+    >
+      <Text style={styles.sectionLabel}>Notifications</Text>
       <View style={styles.card}>
         <View style={styles.row}>
-          <View style={styles.iconWrap}>
-            <Ionicons
-              name="notifications-outline"
-              size={22}
-              color={theme.colors.primary}
-            />
-          </View>
-          <View style={styles.rowCopy}>
-            <Text style={styles.rowTitle}>Nearby enforcement alerts</Text>
-            <Text style={styles.rowSubtitle}>
-              Get warnings while your car is parked.
-            </Text>
-          </View>
+          <Text style={styles.rowTitle}>Nearby enforcement alerts</Text>
           <Switch
+            style={styles.settingSwitch}
             accessibilityLabel="Nearby enforcement alerts"
             testID="settings-notifications-switch"
             value={settings.notificationsEnabled}
             onValueChange={(value) =>
               updateSettings({ ...settings, notificationsEnabled: value })
             }
-            trackColor={{ false: '#CBD5E1', true: '#9CC7F4' }}
-            thumbColor={
-              settings.notificationsEnabled ? theme.colors.primary : '#F8FAFC'
-            }
+            trackColor={{ false: theme.colors.border.medium, true: theme.colors.primary }}
+            thumbColor={theme.colors.white}
+            ios_backgroundColor={theme.colors.border.medium}
           />
         </View>
-
         <View style={styles.divider} />
-        <Text style={styles.sectionLabel}>ALERT RADIUS</Text>
-        <Text style={styles.radiusDescription}>
-          Drag to choose how far reports and notifications can reach. Current
-          radius:{' '}
-          <Text style={styles.radiusValue}>
+        <View style={styles.radiusHeader}>
+          <Text style={styles.radiusTitle}>Alert radius</Text>
+          <Text accessibilityLiveRegion="polite" style={styles.radiusValue}>
             {formatRadius(settings.notificationRadiusMeters)}
           </Text>
-        </Text>
+        </View>
         <NotchedSlider
           options={NOTIFICATION_RADIUS_OPTIONS}
           value={settings.notificationRadiusMeters}
@@ -270,23 +254,16 @@ export default function SettingsScreen() {
           }
         />
       </View>
+      <Text style={styles.groupFootnote}>
+        Get community enforcement alerts near your parked location.
+      </Text>
 
-      <View style={styles.card}>
+      <Text style={styles.sectionLabel}>Parking</Text>
+      <View style={[styles.card, styles.singleRowCard]}>
         <View style={styles.row}>
-          <View style={styles.iconWrap}>
-            <Ionicons
-              name="car-outline"
-              size={22}
-              color={theme.colors.primary}
-            />
-          </View>
-          <View style={styles.rowCopy}>
-            <Text style={styles.rowTitle}>Offer to share my open spot</Text>
-            <Text style={styles.rowSubtitle}>
-              When enabled, the main action becomes “Unpark & share.”
-            </Text>
-          </View>
+          <Text style={styles.rowTitle}>Offer to share my open spot</Text>
           <Switch
+            style={styles.settingSwitch}
             accessibilityLabel="Offer to share my open spot"
             testID="settings-share-open-spot-switch"
             value={settings.announceOpenSpotAfterUnparking}
@@ -296,157 +273,58 @@ export default function SettingsScreen() {
                 announceOpenSpotAfterUnparking: value,
               })
             }
-            trackColor={{ false: '#CBD5E1', true: '#9CC7F4' }}
-            thumbColor={
-              settings.announceOpenSpotAfterUnparking
-                ? theme.colors.primary
-                : '#F8FAFC'
-            }
+            trackColor={{ false: theme.colors.border.medium, true: theme.colors.primary }}
+            thumbColor={theme.colors.white}
+            ios_backgroundColor={theme.colors.border.medium}
           />
         </View>
       </View>
-
-      <View style={styles.infoCard}>
-        <Ionicons
-          name="shield-checkmark-outline"
-          size={24}
-          color={theme.colors.primary}
-        />
-        <View style={styles.infoCopy}>
-          <Text style={styles.infoTitle}>Privacy first</Text>
-          <Text style={styles.infoText}>
-            Sharing an open spot never shares your name, vehicle, or
-            parking-session details. Nearby drivers only see the spot location
-            and expiry window.
-          </Text>
-        </View>
-      </View>
+      <Text style={styles.groupFootnote}>
+        When you unpark, share an approximate location with nearby drivers.
+        Your name, vehicle, and private parking session stay private.
+      </Text>
     </ScrollView>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { backgroundColor: '#F7F9FC', flex: 1 },
-  content: { padding: theme.spacing.lg, paddingBottom: theme.spacing.xxl },
-  header: { marginBottom: theme.spacing.lg },
-  headerRule: {
-    backgroundColor: theme.colors.primary,
-    borderRadius: 2,
-    height: 4,
-    marginBottom: theme.spacing.md,
-    width: 32,
-  },
-  eyebrow: {
-    color: theme.colors.primary,
-    fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 1.3,
-  },
-  title: {
-    color: theme.colors.text,
-    fontSize: 26,
-    fontWeight: '800',
-    marginTop: 4,
-  },
-  subtitle: {
-    color: theme.colors.textSecondary,
-    fontSize: 15,
-    lineHeight: 22,
-    marginTop: theme.spacing.xs,
-  },
-  card: {
-    backgroundColor: theme.colors.white,
-    borderColor: theme.colors.border.light,
-    borderRadius: 14,
-    borderWidth: 1,
-    marginBottom: theme.spacing.md,
-    padding: theme.spacing.md,
-    ...theme.shadows.small,
-  },
-  row: { alignItems: 'center', flexDirection: 'row' },
-  iconWrap: {
-    alignItems: 'center',
-    backgroundColor: theme.colors.primaryLight,
-    borderRadius: 12,
-    height: 42,
-    justifyContent: 'center',
-    width: 42,
-  },
-  rowCopy: { flex: 1, marginHorizontal: theme.spacing.sm },
-  rowTitle: { color: theme.colors.text, fontSize: 15, fontWeight: '800' },
-  rowSubtitle: {
-    color: theme.colors.textSecondary,
-    fontSize: 12,
-    lineHeight: 18,
-    marginTop: 3,
-  },
-  divider: {
-    backgroundColor: '#EDF0F5',
-    height: 1,
-    marginVertical: theme.spacing.md,
-  },
+const createStyles = (theme) => StyleSheet.create({
+  container: { backgroundColor: theme.colors.background, flex: 1 },
+  content: { paddingHorizontal: theme.spacing.lg, paddingTop: 20 },
   sectionLabel: {
     color: theme.colors.textSecondary,
-    fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 1.2,
-  },
-  radiusDescription: {
-    color: theme.colors.textSecondary,
     fontSize: 13,
-    lineHeight: 19,
-    marginTop: theme.spacing.xs,
+    fontWeight: '500',
+    marginBottom: 8,
+    marginLeft: 3,
   },
-  radiusValue: { color: theme.colors.primaryDark, fontWeight: '800' },
-  radiusSlider: {
-    height: 44,
-    justifyContent: 'center',
-    marginTop: theme.spacing.md,
+  card: {
+    backgroundColor: theme.colors.surface,
+    borderRadius: 20,
+    paddingHorizontal: theme.spacing.md,
+    paddingBottom: 16,
   },
-  radiusSliderRail: {
-    height: 32,
-    justifyContent: 'center',
-    marginHorizontal: SLIDER_TRACK_INSET,
-    position: 'relative',
-  },
-  radiusSliderTrack: {
-    backgroundColor: '#D9E2EF',
-    borderRadius: 2,
-    height: 4,
-    left: 0,
-    position: 'absolute',
-    right: 0,
-    top: 14,
-  },
-  radiusSliderFill: {
-    backgroundColor: theme.colors.primary,
-    borderRadius: 2,
-    height: 4,
-    left: 0,
-    position: 'absolute',
-    top: 14,
-  },
-  radiusSliderNotches: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    left: 0,
-    position: 'absolute',
-    right: 0,
-    top: 9,
-  },
-  radiusSliderNotch: {
-    backgroundColor: '#B7C6D8',
-    borderRadius: 1,
-    height: 14,
-    width: 2,
-  },
-  radiusSliderNotchActive: { backgroundColor: theme.colors.primary },
+  singleRowCard: { paddingBottom: 0 },
+  row: { alignItems: 'center', flexDirection: 'row', minHeight: 68 },
+  settingSwitch: { minHeight: 44, minWidth: 44 },
+  rowTitle: { color: theme.colors.text, flex: 1, fontSize: 15, fontWeight: '500', lineHeight: 22, marginRight: 12 },
+  divider: { backgroundColor: theme.colors.border.light, height: StyleSheet.hairlineWidth },
+  radiusHeader: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', marginTop: 17 },
+  radiusTitle: { color: theme.colors.text, fontSize: 15, fontWeight: '400' },
+  radiusValue: { color: theme.colors.primaryDark, fontSize: 15, fontWeight: '600' },
+  groupFootnote: { color: theme.colors.textSecondary, fontSize: 12, lineHeight: 18, marginBottom: 28, marginHorizontal: 6, marginTop: 10 },
+  radiusSlider: { height: 44, justifyContent: 'center', marginTop: 7 },
+  radiusSliderRail: { height: 32, justifyContent: 'center', marginHorizontal: SLIDER_TRACK_INSET, position: 'relative' },
+  radiusSliderTrack: { backgroundColor: theme.colors.border.medium, borderRadius: 2, height: 4, left: 0, position: 'absolute', right: 0, top: 14 },
+  radiusSliderFill: { backgroundColor: theme.colors.primaryDark, borderRadius: 2, height: 4, left: 0, position: 'absolute', top: 14 },
+  radiusSliderNotches: { flexDirection: 'row', justifyContent: 'space-between', left: 0, position: 'absolute', right: 0, top: 12 },
+  radiusSliderNotch: { backgroundColor: theme.colors.border.medium, borderRadius: 1, height: 8, width: 2 },
+  radiusSliderNotchActive: { backgroundColor: theme.colors.primaryDark },
   radiusSliderThumb: {
     alignItems: 'center',
-    backgroundColor: theme.colors.white,
-    borderColor: theme.colors.primary,
+    backgroundColor: theme.colors.surface,
+    borderColor: theme.colors.primaryDark,
     borderRadius: 12,
-    borderWidth: 3,
+    borderWidth: 2,
     height: 24,
     justifyContent: 'center',
     marginLeft: -12,
@@ -455,39 +333,7 @@ const styles = StyleSheet.create({
     width: 24,
     ...theme.shadows.small,
   },
-  radiusSliderThumbCenter: {
-    backgroundColor: theme.colors.primary,
-    borderRadius: 3,
-    height: 6,
-    width: 6,
-  },
-  radiusSliderLabels: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: -2,
-  },
-  radiusSliderLabel: {
-    color: theme.colors.textSecondary,
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  infoCard: {
-    alignItems: 'flex-start',
-    backgroundColor: theme.colors.primaryLight,
-    borderRadius: 14,
-    flexDirection: 'row',
-    padding: theme.spacing.md,
-  },
-  infoCopy: { flex: 1, marginLeft: theme.spacing.sm },
-  infoTitle: {
-    color: theme.colors.primaryDark,
-    fontSize: 14,
-    fontWeight: '800',
-  },
-  infoText: {
-    color: theme.colors.primaryDark,
-    fontSize: 12,
-    lineHeight: 18,
-    marginTop: 3,
-  },
+  radiusSliderThumbCenter: { backgroundColor: theme.colors.primaryDark, borderRadius: 3, height: 6, width: 6 },
+  radiusSliderLabels: { flexDirection: 'row', justifyContent: 'space-between', marginTop: -2 },
+  radiusSliderLabel: { color: theme.colors.textSecondary, fontSize: 12, fontWeight: '400' },
 });

@@ -1,11 +1,12 @@
 import { createContext, useContext, useMemo, useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { theme } from '../theme';
+import { useThemedStyles } from '../theme';
 
 const ModalContext = createContext(null);
 
 export function AppModalProvider({ children }) {
+  const { theme, styles } = useThemedStyles(createStyles);
   const [state, setState] = useState(null);
 
   const hideModal = () => setState(null);
@@ -28,7 +29,7 @@ export function AppModalProvider({ children }) {
         <View style={styles.backdrop}>
           <View style={styles.card}>
             <View style={styles.iconWrap}>
-              <Ionicons name="information-circle-outline" size={23} color={theme.colors.primary} />
+              <Ionicons name="information-circle-outline" size={23} color={theme.colors.primaryDark} />
             </View>
             <Text style={styles.title}>{state?.title}</Text>
             <Text style={styles.message}>{state?.message}</Text>
@@ -70,19 +71,19 @@ export function useAppModal() {
   return context;
 }
 
-const styles = StyleSheet.create({
-  backdrop: { alignItems: 'center', backgroundColor: 'rgba(18,35,45,0.42)', flex: 1, justifyContent: 'center', padding: theme.spacing.lg },
-  card: { backgroundColor: theme.colors.surface, borderColor: theme.colors.border.light, borderRadius: theme.borderRadius.lg, borderWidth: 1, maxWidth: 380, padding: theme.spacing.lg, width: '100%', ...theme.shadows.large },
+const createStyles = (theme) => StyleSheet.create({
+  backdrop: { alignItems: 'center', backgroundColor: theme.colors.backdrop, flex: 1, justifyContent: 'center', padding: theme.spacing.lg },
+  card: { backgroundColor: theme.colors.surface, borderRadius: 26, maxWidth: 380, padding: theme.spacing.lg, width: '100%', ...theme.shadows.large },
   iconWrap: { alignItems: 'center', alignSelf: 'center', backgroundColor: theme.colors.primaryLight, borderRadius: 22, height: 44, justifyContent: 'center', width: 44 },
-  title: { color: theme.colors.text, fontSize: 19, fontWeight: '800', marginTop: theme.spacing.md, textAlign: 'center' },
+  title: { color: theme.colors.text, fontSize: 20, fontWeight: '600', marginTop: theme.spacing.md, textAlign: 'center' },
   message: { color: theme.colors.textSecondary, fontSize: 14, lineHeight: 21, marginTop: theme.spacing.xs, textAlign: 'center' },
   actions: { marginTop: theme.spacing.lg },
   actionsMultiple: { flexDirection: 'row-reverse', gap: theme.spacing.sm },
-  action: { alignItems: 'center', backgroundColor: theme.colors.primary, borderRadius: theme.borderRadius.md, justifyContent: 'center', minHeight: 46, paddingHorizontal: theme.spacing.md },
+  action: { alignItems: 'center', backgroundColor: theme.colors.primary, borderRadius: 16, justifyContent: 'center', minHeight: 50, paddingHorizontal: theme.spacing.md },
   actionMultiple: { flex: 1 },
-  destructiveAction: { backgroundColor: theme.colors.error },
+  destructiveAction: { backgroundColor: theme.colors.dangerBackground },
   cancelAction: { backgroundColor: theme.colors.surfaceSubtle },
-  actionText: { color: theme.colors.white, fontSize: 14, fontWeight: '800', textAlign: 'center' },
+  actionText: { color: theme.colors.white, fontSize: 15, fontWeight: '600', textAlign: 'center' },
   destructiveText: { color: theme.colors.white },
   cancelText: { color: theme.colors.textSecondary },
   pressed: { opacity: 0.78 },

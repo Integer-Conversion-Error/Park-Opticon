@@ -1,0 +1,56 @@
+{
+  "platform": "Android 16 / API 36, gesture navigation, light appearance",
+  "source": "Read-only native Google Maps getCamera and pointForCoordinate calls on the rebuilt app; reports created through the guest UI",
+  "viewportDp": {
+    "width": 411.42857142857144,
+    "height": 914.2857142857143
+  },
+  "before": {
+    "camera": {
+      "zoom": 16.485998153686523,
+      "heading": 0,
+      "pitch": 0,
+      "center": {
+        "longitude": -122.42576591670513,
+        "latitude": 37.77570658295792
+      }
+    },
+    "mapPadding": {
+      "top": 195.00000762939453,
+      "right": 10,
+      "bottom": 198.09527587890625,
+      "left": 10
+    }
+  },
+  "after": {
+    "camera": {
+      "zoom": 16.485998153686523,
+      "heading": 0,
+      "pitch": 0,
+      "center": {
+        "longitude": -122.42299988865852,
+        "latitude": 37.776899900827146
+      }
+    },
+    "mapPadding": {
+      "top": 195.00000762939453,
+      "right": 10,
+      "bottom": 313.90478515625,
+      "left": 10
+    },
+    "selectedMarker": {
+      "label": "ticketing",
+      "selected": true,
+      "stale": false,
+      "coordinate": {
+        "latitude": 37.7769,
+        "longitude": -122.423
+      },
+      "point": {
+        "y": 397.3333333333333,
+        "x": 205.71428571428572
+      }
+    }
+  },
+  "screenshot": "after/detail-android-gesture-light.png"
+}

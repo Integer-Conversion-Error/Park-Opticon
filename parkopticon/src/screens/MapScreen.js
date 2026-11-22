@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AppState,
+  BackHandler,
   FlatList,
   Modal,
   Platform,
@@ -10,13 +11,15 @@ import {
   View,
 } from 'react-native';
 import { useIsFocused } from '@react-navigation/native';
+import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
-import MapView, { Marker } from 'react-native-maps';
+import MapView from 'react-native-maps';
 import * as Location from 'expo-location';
 import Constants from 'expo-constants';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button } from '../components';
-import { theme } from '../theme';
+import ReportMarker from '../components/ReportMarker';
+import { useThemedStyles } from '../theme';
 import {
   DEFAULT_SETTINGS,
   applyVerification,
@@ -50,6 +53,17 @@ const FALLBACK_REGION = {
 const REPORT_FOCUS_TOP_HALF_OFFSET = 0.24;
 const EVENT_REFRESH_INTERVAL_MS = 60_000;
 
+const getReportPresentation = (report, theme) => {
+  const meta = getReportMeta(report);
+  const color = report.type === 'parking'
+    ? theme.colors.success
+    : report.type === 'chalking' ? theme.colors.secondaryDark : theme.colors.error;
+  const backgroundColor = report.type === 'parking'
+    ? theme.colors.successLight
+    : report.type === 'chalking' ? theme.colors.secondaryLight : theme.colors.errorLight;
+  return { ...meta, color, backgroundColor, label: report.type === 'parking' ? 'Open spot' : meta.shortLabel || meta.label };
+};
+
 const wait = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
 
 const getAddressWithTimeout = async (coords) => {
@@ -67,20 +81,22 @@ const getAddressWithTimeout = async (coords) => {
 };
 
 function ReportDetailCard({ report, location, onClose, onVerify, verificationMessage, now }) {
-  const meta = getReportMeta(report);
+  const { theme, styles } = useThemedStyles(createStyles);
+  const meta = getReportPresentation(report, theme);
   const canVerify = canVerifyReport(location, report);
   const isStale = getParkingSpotStatus(report, now) === 'stale';
+  const reportDistance = distanceMeters(location, report);
 
   return (
     <View accessibilityViewIsModal style={styles.reportDetailCard}>
       <View style={styles.reportDetailHeader}>
         <View style={styles.reportDetailTitleRow}>
-          <View style={[styles.reportDetailIcon, { backgroundColor: `${meta.color}20` }]}>
+          <View style={[styles.reportDetailIcon, { backgroundColor: meta.backgroundColor }]}>
             <Ionicons name={meta.icon} size={20} color={meta.color} />
           </View>
           <View style={styles.reportDetailTitleCopy}>
             <Text style={styles.reportDetailTitle}>{isStale ? 'Stale open spot' : meta.label}</Text>
-            <Text style={styles.reportDetailAge}>{formatTimeAgo(report.createdAt)}</Text>
+            <Text style={styles.reportDetailAge}>{formatTimeAgo(report.createdAt)}{reportDistance === null ? '' : ` · ${reportDistance} m`}</Text>
           </View>
         </View>
         <Pressable
@@ -89,7 +105,7 @@ function ReportDetailCard({ report, location, onClose, onVerify, verificationMes
           onPress={onClose}
           style={styles.closeButton}
         >
-          <Ionicons name="close" size={18} color={theme.colors.textSecondary} />
+          <View style={styles.closeButtonIcon}><Ionicons name="close" size={18} color={theme.colors.textSecondary} /></View>
         </Pressable>
       </View>
 
@@ -109,7 +125,8 @@ function ReportDetailCard({ report, location, onClose, onVerify, verificationMes
               style={[styles.verifyButton, styles.confirmButton]}
               onPress={() => onVerify('confirm')}
             >
-              <Text style={styles.confirmButtonText}>✓ Confirm</Text>
+              <Ionicons name="checkmark" size={17} color={theme.colors.white} />
+              <Text style={styles.confirmButtonText}>Confirm</Text>
             </Pressable>
             <Pressable
               accessibilityRole="button"
@@ -117,7 +134,8 @@ function ReportDetailCard({ report, location, onClose, onVerify, verificationMes
               style={[styles.verifyButton, styles.denyButton]}
               onPress={() => onVerify('deny')}
             >
-              <Text style={styles.denyButtonText}>✕ Not here</Text>
+              <Ionicons name="close" size={17} color={theme.colors.text} />
+              <Text style={styles.denyButtonText}>Not here</Text>
             </Pressable>
           </View>
         </>
@@ -130,9 +148,10 @@ function ReportDetailCard({ report, location, onClose, onVerify, verificationMes
 }
 
 function MapStatusPill({ accessibilityLabel, icon, onPress, text, tone = 'default' }) {
+  const { theme, styles } = useThemedStyles(createStyles);
   const content = (
     <>
-      <Ionicons name={icon} size={16} color={tone === 'warning' ? theme.colors.warning : theme.colors.primary} />
+      <Ionicons name={icon} size={16} color={tone === 'warning' ? theme.colors.secondaryDark : theme.colors.primary} />
       <Text numberOfLines={1} style={[styles.statusText, tone === 'warning' && styles.statusTextWarning]}>{text}</Text>
     </>
   );
@@ -158,7 +177,8 @@ function MapStatusPill({ accessibilityLabel, icon, onPress, text, tone = 'defaul
   );
 }
 
-function NearbyReportsModal({ insets, location, now, onClose, onSelect, reports, selectedReportId, visible }) {
+function NearbyReportsModal({ insets, localReports, location, now, onClose, onSelect, reports, selectedReportId, visible }) {
+  const { theme, styles } = useThemedStyles(createStyles);
   return (
     <Modal
       animationType="slide"
@@ -173,7 +193,8 @@ function NearbyReportsModal({ insets, location, now, onClose, onSelect, reports,
           <View style={styles.nearbyReportsHandle} />
           <View style={styles.nearbyReportsHeader}>
             <View>
-              <Text style={styles.nearbyReportsSheetTitle}>Nearby reports · {reports.length}</Text>
+              <Text accessibilityRole="header" style={styles.nearbyReportsSheetTitle}>{localReports ? 'Saved reports' : 'Nearby reports'}</Text>
+              <Text style={styles.nearbyReportsSheetSubtitle}>{reports.length} {localReports ? 'saved on this device' : `community report${reports.length === 1 ? '' : 's'}`}</Text>
             </View>
             <Pressable
               accessibilityRole="button"
@@ -181,7 +202,7 @@ function NearbyReportsModal({ insets, location, now, onClose, onSelect, reports,
               onPress={onClose}
               style={styles.nearbyReportsCloseButton}
             >
-              <Ionicons name="close" size={18} color={theme.colors.textSecondary} />
+              <View style={styles.closeButtonIcon}><Ionicons name="close" size={18} color={theme.colors.textSecondary} /></View>
             </Pressable>
           </View>
 
@@ -192,13 +213,13 @@ function NearbyReportsModal({ insets, location, now, onClose, onSelect, reports,
             showsVerticalScrollIndicator={false}
             ListEmptyComponent={(
               <View style={styles.nearbyReportsEmpty}>
-                <Ionicons name="map-outline" size={24} color={theme.colors.primary} />
-                <Text style={styles.nearbyReportsEmptyTitle}>No nearby reports</Text>
-                <Text style={styles.nearbyReportsEmptyText}>New community signals will appear here.</Text>
+                <Ionicons name="map-outline" size={24} color={theme.colors.primaryDark} />
+                <Text style={styles.nearbyReportsEmptyTitle}>{localReports ? 'No saved reports' : 'No nearby reports'}</Text>
+                <Text style={styles.nearbyReportsEmptyText}>{localReports ? 'Reports saved on this device will appear here.' : 'New community signals will appear here.'}</Text>
               </View>
             )}
             renderItem={({ item }) => {
-              const meta = getReportMeta(item);
+              const meta = getReportPresentation(item, theme);
               const isStale = getParkingSpotStatus(item, now) === 'stale';
               const isSelected = selectedReportId === item.id;
               const reportDistance = distanceMeters(location, item);
@@ -212,7 +233,7 @@ function NearbyReportsModal({ insets, location, now, onClose, onSelect, reports,
                   onPress={() => onSelect(item)}
                   style={({ pressed }) => [styles.nearbyReportRow, isSelected && styles.nearbyReportRowSelected, pressed && styles.nearbyReportRowPressed]}
                 >
-                  <View style={[styles.nearbyReportIcon, { backgroundColor: isStale ? '#E2E8F0' : `${meta.color}20` }]}>
+                  <View style={[styles.nearbyReportIcon, { backgroundColor: isStale ? theme.colors.surfaceSubtle : meta.backgroundColor }]}>
                     <Ionicons name={meta.icon} size={18} color={isStale ? theme.colors.textMuted : meta.color} />
                   </View>
                   <View style={styles.nearbyReportCopy}>
@@ -231,6 +252,7 @@ function NearbyReportsModal({ insets, location, now, onClose, onSelect, reports,
 }
 
 export default function MapScreen(props) {
+  const { styles } = useThemedStyles(createStyles);
   const insets = useSafeAreaInsets();
   const error = getMapConfigurationError({
     platform: Platform.OS,
@@ -251,8 +273,21 @@ export default function MapScreen(props) {
 }
 
 function ReadyMapScreen({ navigation }) {
+  const { theme, styles } = useThemedStyles(createStyles);
   const mapRef = useRef(null);
   const insets = useSafeAreaInsets();
+  const tabBarHeight = useBottomTabBarHeight();
+  const [bottomCardLayout, setBottomCardLayout] = useState({ height: 80, reportId: null });
+  const [topOverlayHeight, setTopOverlayHeight] = useState(0);
+  const mapStyle = useMemo(() => theme.dark ? [
+    { elementType: 'geometry', stylers: [{ color: theme.colors.mapBackground }] },
+    { elementType: 'labels.text.fill', stylers: [{ color: theme.colors.textSecondary }] },
+    { elementType: 'labels.text.stroke', stylers: [{ color: theme.colors.mapBackground }] },
+    { featureType: 'road', elementType: 'geometry', stylers: [{ color: theme.colors.surfaceDark }] },
+    { featureType: 'water', elementType: 'geometry', stylers: [{ color: theme.colors.primaryLight }] },
+    { featureType: 'poi.park', elementType: 'geometry', stylers: [{ color: theme.colors.successLight }] },
+    { featureType: 'poi.business', stylers: [{ visibility: 'off' }] },
+  ] : [], [theme]);
   const { showModal } = useAppModal();
   const isFocused = useIsFocused();
   const [location, setLocation] = useState(null);
@@ -266,6 +301,7 @@ function ReadyMapScreen({ navigation }) {
   const [isUnparking, setIsUnparking] = useState(false);
   const [alertsReady, setAlertsReady] = useState(false);
   const [selectedReportId, setSelectedReportId] = useState(null);
+  const [pendingReportFocus, setPendingReportFocus] = useState(null);
   const [reportsModalVisible, setReportsModalVisible] = useState(false);
   const [verificationMessage, setVerificationMessage] = useState('');
   const [syncError, setSyncError] = useState(() => (
@@ -279,6 +315,15 @@ function ReadyMapScreen({ navigation }) {
   const sessionHydratedRef = useRef(false);
   const finishingSessionRef = useRef(false);
   const currentRegionRef = useRef(FALLBACK_REGION);
+
+  useEffect(() => {
+    if (!isFocused || !selectedReportId) return undefined;
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      setSelectedReportId(null);
+      return true;
+    });
+    return () => subscription.remove();
+  }, [isFocused, selectedReportId]);
 
   const refreshLocation = useCallback(async (showError = false) => {
     setLocationLoading(true);
@@ -373,6 +418,12 @@ function ReadyMapScreen({ navigation }) {
 
   const visibleReports = useMemo(() => reports.filter((report) => isReportVisible(report, now)), [now, reports]);
   const selectedReport = visibleReports.find((report) => report.id === selectedReportId) || null;
+  const localReports = !apiAvailable() || Boolean(syncError);
+  const reportSummary = useMemo(() => {
+    const enforcement = visibleReports.filter((report) => report.type !== 'parking').length;
+    const parking = visibleReports.length - enforcement;
+    return [enforcement ? `${enforcement} enforcement` : null, parking ? `${parking} open spot${parking === 1 ? '' : 's'}` : null].filter(Boolean).join(' · ');
+  }, [visibleReports]);
 
   const enableParkingAlerts = useCallback(async () => {
     if (!settings.notificationsEnabled || !apiAvailable()) {
@@ -527,7 +578,7 @@ function ReadyMapScreen({ navigation }) {
         setReports(nextReports);
       }
       if (shareOpenSpot) {
-        setSessionNotice('Open spot shared for 15 min');
+        setSessionNotice(apiAvailable() ? 'Open spot shared for 15 min' : 'Open spot saved on this device');
         setTimeout(() => setSessionNotice(''), 3500);
       }
     } catch (error) {
@@ -575,19 +626,34 @@ function ReadyMapScreen({ navigation }) {
   };
 
   const focusReportOnMap = useCallback((report) => {
-    const currentRegion = currentRegionRef.current || FALLBACK_REGION;
     setSelectedReportId(report.id);
     setVerificationMessage('');
-    // The reports sheet occupies the lower half of the screen, so the map
-    // center is shifted south to keep the selected marker in the visible top half.
-    mapRef.current?.animateToRegion({
-      latitude: report.latitude - currentRegion.latitudeDelta * REPORT_FOCUS_TOP_HALF_OFFSET,
-      longitude: report.longitude,
-      latitudeDelta: currentRegion.latitudeDelta,
-      longitudeDelta: currentRegion.longitudeDelta,
-    }, 450);
+    setPendingReportFocus(report);
     setReportsModalVisible(false);
   }, []);
+
+  useEffect(() => {
+    if (!pendingReportFocus) return undefined;
+    if (selectedReport?.id !== pendingReportFocus.id) {
+      setPendingReportFocus(null);
+      return undefined;
+    }
+    if (reportsModalVisible
+      || bottomCardLayout.reportId !== pendingReportFocus.id
+      || bottomCardLayout.height <= 0) return undefined;
+
+    // Changing native map padding moves the camera and cancels its animation.
+    // Wait for the selected card's measured padding to commit before focusing.
+    const frame = requestAnimationFrame(() => {
+      const currentRegion = currentRegionRef.current || FALLBACK_REGION;
+      const latitudeOffset = Platform.OS === 'android' ? 0 : currentRegion.latitudeDelta * REPORT_FOCUS_TOP_HALF_OFFSET;
+      mapRef.current?.animateCamera({
+        center: { latitude: pendingReportFocus.latitude - latitudeOffset, longitude: pendingReportFocus.longitude },
+      }, { duration: 450 });
+      setPendingReportFocus(null);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [bottomCardLayout, pendingReportFocus, reportsModalVisible, selectedReport]);
 
   const parkedMinutes = parkingSession
     ? Math.max(0, Math.floor((now - new Date(parkingSession.startedAt).getTime()) / 60000))
@@ -620,15 +686,15 @@ function ReadyMapScreen({ navigation }) {
             text: !apiAvailable() || syncError
               ? 'Parked · saved locally'
               : !settings.notificationsEnabled
-                ? 'Parked · alerts off'
+                ? 'Alerts off'
                 : alertsReady
-                ? 'Parked · alerts on'
-                : 'Parked · protection active',
+                ? 'Alerts on'
+                : 'Alerts unavailable',
           }
         : locationLoading
           ? { icon: 'locate-outline', text: 'Finding your location…' }
         : syncError
-          ? { icon: 'cloud-offline-outline', text: 'Offline · reports saved locally', tone: 'warning' }
+          ? { icon: 'cloud-offline-outline', text: apiAvailable() ? 'Offline · saved reports' : 'Guest · saved on this device', tone: 'warning' }
           : null;
 
   return (
@@ -637,6 +703,9 @@ function ReadyMapScreen({ navigation }) {
         ref={mapRef}
         style={styles.map}
         initialRegion={FALLBACK_REGION}
+        userInterfaceStyle={theme.dark ? 'dark' : 'light'}
+        customMapStyle={Platform.OS === 'android' ? mapStyle : undefined}
+        mapPadding={{ top: insets.top + 15 + topOverlayHeight + 12, right: 10, bottom: tabBarHeight + bottomCardLayout.height + 24, left: 10 }}
         onRegionChangeComplete={(region) => { currentRegionRef.current = region; }}
         showsUserLocation={Boolean(location)}
         showsMyLocationButton
@@ -644,34 +713,28 @@ function ReadyMapScreen({ navigation }) {
         onPress={() => setSelectedReportId(null)}
       >
         {visibleReports.map((report) => {
-          const meta = getReportMeta(report);
           const isStale = getParkingSpotStatus(report, now) === 'stale';
           const isSelected = selectedReportId === report.id;
           return (
-            <Marker
+            <ReportMarker
               key={report.id}
-              coordinate={{ latitude: report.latitude, longitude: report.longitude }}
+              report={report}
+              isStale={isStale}
+              isSelected={isSelected}
               onPress={() => setSelectedReportId(report.id)}
-              tracksViewChanges={false}
-              accessible
-              accessibilityLabel={`${isStale ? 'Stale open spot' : meta.label}, ${formatTimeAgo(report.createdAt)}. Double tap for details.`}
-              accessibilityHint="Opens report details and verification options"
-            >
-              <View
-                style={[styles.marker, { backgroundColor: isStale ? '#94A3B8' : meta.color }, isSelected && styles.markerSelected]}
-              >
-                <Ionicons name={meta.icon} size={16} color={theme.colors.white} />
-              </View>
-            </Marker>
+            />
           );
         })}
       </MapView>
 
-      <View style={[styles.topOverlay, { top: insets.top + 10 }]}>
+      <View
+        onLayout={({ nativeEvent }) => setTopOverlayHeight(nativeEvent.layout.height)}
+        style={[styles.topOverlay, { top: insets.top + 15 }]}
+      >
         {status ? <MapStatusPill {...status} /> : null}
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={`View ${visibleReports.length} nearby reports`}
+          accessibilityLabel={`View ${visibleReports.length} ${localReports ? 'saved' : 'nearby'} reports`}
           accessibilityHint="Opens the nearby reports sheet"
           onPress={() => {
             setSelectedReportId(null);
@@ -680,22 +743,29 @@ function ReadyMapScreen({ navigation }) {
           style={({ pressed }) => [styles.nearbyReportsCard, pressed && styles.nearbyReportsCardPressed]}
         >
           <View style={styles.nearbyReportsIcon}>
-            <Ionicons name="pulse-outline" size={17} color={theme.colors.primary} />
+            <Ionicons name="layers-outline" size={18} color={theme.colors.primaryDark} />
           </View>
           <View style={styles.nearbyReportsCopy}>
             <Text numberOfLines={1} style={styles.nearbyReportsTitle}>
-              {visibleReports.length} nearby report{visibleReports.length === 1 ? '' : 's'}
+              {visibleReports.length} {localReports ? 'saved' : 'nearby'} report{visibleReports.length === 1 ? '' : 's'}
             </Text>
             <Text numberOfLines={1} style={styles.nearbyReportsSubtitle}>
-              {visibleReports.length ? 'Review community signals' : 'Nothing to review right now'}
+              {localReports ? 'Saved on this device' : reportSummary || 'No community reports nearby'}
             </Text>
           </View>
           <Ionicons name="chevron-forward" size={16} color={theme.colors.textMuted} />
         </Pressable>
       </View>
 
-      {/* The bottom-tab navigator already reserves the Android safe area. */}
-      <View style={[styles.bottomOverlay, { bottom: 8 }]}>
+      {/* Keep actions and native map attribution above the floating tabs. */}
+      <View
+        key={`${selectedReport?.id || 'parking'}-${reportsModalVisible ? 'hidden' : 'shown'}`}
+        onLayout={({ nativeEvent }) => setBottomCardLayout({
+          height: nativeEvent.layout.height,
+          reportId: selectedReport && !reportsModalVisible ? selectedReport.id : null,
+        })}
+        style={[styles.bottomOverlay, { bottom: tabBarHeight + 10 }]}
+      >
         {selectedReport && !reportsModalVisible ? (
           <ReportDetailCard
             report={selectedReport}
@@ -717,6 +787,7 @@ function ReadyMapScreen({ navigation }) {
                 variant="primary"
                 size="medium"
                 loading={isParking || isUnparking}
+                icon={<Ionicons name={parkingSession ? 'car-outline' : 'location-outline'} size={19} color={theme.colors.white} />}
                 style={styles.parkButton}
                 textStyle={styles.parkButtonText}
               />
@@ -729,7 +800,7 @@ function ReadyMapScreen({ navigation }) {
                 })}
                 style={({ pressed }) => [styles.reportActionButton, pressed && styles.reportActionButtonPressed]}
               >
-                <Ionicons name="radio-outline" size={16} color={theme.colors.primaryDark} />
+                <Ionicons name="flag-outline" size={18} color={theme.colors.text} />
                 <Text style={styles.reportActionText}>Report</Text>
               </Pressable>
             </View>
@@ -738,6 +809,7 @@ function ReadyMapScreen({ navigation }) {
       </View>
       <NearbyReportsModal
         insets={insets}
+        localReports={localReports}
         location={location}
         now={now}
         onClose={() => setReportsModalVisible(false)}
@@ -750,142 +822,82 @@ function ReadyMapScreen({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme) => StyleSheet.create({
   configurationError: { flex: 1, backgroundColor: theme.colors.background, paddingHorizontal: 24, justifyContent: 'center' },
-  configurationErrorTitle: { fontSize: 22, fontWeight: '700', color: theme.colors.text, marginBottom: 12 },
+  configurationErrorTitle: { fontSize: 22, fontWeight: '600', color: theme.colors.text, marginBottom: 12 },
   configurationErrorMessage: { fontSize: 16, lineHeight: 24, color: theme.colors.textSecondary, marginBottom: 12 },
   configurationErrorCode: { fontSize: 12, color: theme.colors.error, marginBottom: 24 },
-  container: { flex: 1, backgroundColor: '#DCE9F5' },
+  container: { flex: 1, backgroundColor: theme.colors.mapBackground },
   map: { flex: 1 },
-  topOverlay: {
-    alignItems: 'center',
-    left: theme.spacing.lg,
-    position: 'absolute',
-    right: theme.spacing.lg,
-  },
+  topOverlay: { alignItems: 'center', gap: 10, left: theme.spacing.md, position: 'absolute', right: theme.spacing.md },
   statusPill: {
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.96)',
-    borderColor: theme.colors.border.light,
-    borderRadius: 20,
-    borderWidth: 1,
-    elevation: 4,
-    flexDirection: 'row',
-    maxWidth: '100%',
-    minHeight: 44,
-    paddingHorizontal: theme.spacing.sm,
-    paddingVertical: 6,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 5,
+    alignItems: 'center', backgroundColor: theme.colors.surface, borderRadius: 24,
+    flexDirection: 'row', maxWidth: '100%', minHeight: 44, paddingHorizontal: 13,
+    paddingVertical: 8, ...theme.shadows.small,
   },
-  statusPillWarning: { backgroundColor: '#FFF9ED', borderColor: '#F2C66D' },
-  statusText: { color: theme.colors.text, flexShrink: 1, fontSize: 12, fontWeight: '800', marginLeft: 6 },
-  statusTextWarning: { color: '#8A5A00' },
-  statusPillPressed: { opacity: 0.8, transform: [{ scale: 0.98 }] },
+  statusPillWarning: { backgroundColor: theme.colors.warningLight },
+  statusText: { color: theme.colors.text, flexShrink: 1, fontSize: 12, fontWeight: '500', marginLeft: 6 },
+  statusTextWarning: { color: theme.colors.secondaryDark },
+  statusPillPressed: { opacity: 0.8 },
   nearbyReportsCard: {
-    alignItems: 'center',
-    alignSelf: 'center',
-    backgroundColor: 'rgba(255,255,255,0.96)',
-    borderColor: theme.colors.border.light,
-    borderRadius: 14,
-    borderWidth: 1,
-    flexDirection: 'row',
-    marginTop: 2,
-    maxWidth: 248,
-    minHeight: 48,
-    paddingHorizontal: theme.spacing.sm,
-    ...theme.shadows.small,
+    alignItems: 'center', alignSelf: 'center', backgroundColor: theme.colors.surface,
+    borderRadius: 19, flexDirection: 'row', maxWidth: '100%', minHeight: 62,
+    paddingHorizontal: 13, paddingVertical: 11, width: 246, ...theme.shadows.medium,
   },
-  nearbyReportsCardPressed: { opacity: 0.72, transform: [{ scale: 0.985 }] },
-  nearbyReportsIcon: { alignItems: 'center', backgroundColor: theme.colors.primaryLight, borderRadius: 9, height: 30, justifyContent: 'center', width: 30 },
-  nearbyReportsCopy: { flex: 1, marginHorizontal: 6 },
-  nearbyReportsTitle: { color: theme.colors.text, fontSize: 13, fontWeight: '800' },
-  nearbyReportsSubtitle: { color: theme.colors.textSecondary, fontSize: 11, marginTop: 2 },
-  nearbyReportsBackdrop: { backgroundColor: 'rgba(18,35,45,0.10)', flex: 1, justifyContent: 'flex-end' },
+  nearbyReportsCardPressed: { opacity: 0.75 },
+  nearbyReportsIcon: { alignItems: 'center', backgroundColor: theme.colors.primaryLight, borderRadius: 10, height: 34, justifyContent: 'center', width: 34 },
+  nearbyReportsCopy: { flex: 1, marginHorizontal: 9 },
+  nearbyReportsTitle: { color: theme.colors.text, fontSize: 14, fontWeight: '600' },
+  nearbyReportsSubtitle: { color: theme.colors.textSecondary, fontSize: 12, marginTop: 3 },
+  nearbyReportsBackdrop: { backgroundColor: theme.colors.backdrop, flex: 1, justifyContent: 'flex-end' },
   nearbyReportsSheet: {
-    backgroundColor: theme.colors.surface,
-    borderColor: theme.colors.border.light,
-    borderRadius: 20,
-    borderWidth: 1,
-    height: '52%',
-    marginHorizontal: theme.spacing.md,
-    maxHeight: 440,
-    minHeight: 260,
-    padding: 12,
-    ...theme.shadows.large,
+    backgroundColor: theme.colors.surface, borderRadius: 30, height: '52%',
+    marginHorizontal: 9, maxHeight: 440, minHeight: 300, paddingHorizontal: 18,
+    paddingTop: 10, paddingBottom: 18, ...theme.shadows.large,
   },
-  nearbyReportsHandle: { alignSelf: 'center', backgroundColor: theme.colors.border.medium, borderRadius: 2, height: 4, marginBottom: 6, width: 28 },
-  nearbyReportsHeader: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
-  nearbyReportsSheetTitle: { color: theme.colors.text, fontSize: 16, fontWeight: '800' },
+  nearbyReportsHandle: { alignSelf: 'center', backgroundColor: theme.colors.border.medium, borderRadius: 2, height: 4, marginBottom: 10, width: 32 },
+  nearbyReportsHeader: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', marginBottom: 7 },
+  nearbyReportsSheetTitle: { color: theme.colors.text, fontSize: 21, fontWeight: '600', lineHeight: 27 },
+  nearbyReportsSheetSubtitle: { color: theme.colors.textSecondary, fontSize: 12, marginTop: 4 },
   nearbyReportsCloseButton: { alignItems: 'center', borderRadius: 22, height: 44, justifyContent: 'center', marginLeft: theme.spacing.sm, width: 44 },
   nearbyReportsList: { paddingBottom: theme.spacing.xs },
   nearbyReportsEmptyList: { flexGrow: 1, justifyContent: 'center' },
   nearbyReportsEmpty: { alignItems: 'center', padding: theme.spacing.md },
-  nearbyReportsEmptyTitle: { color: theme.colors.text, fontSize: 15, fontWeight: '800', marginTop: 6 },
-  nearbyReportsEmptyText: { color: theme.colors.textSecondary, fontSize: 12, marginTop: 2, textAlign: 'center' },
-  nearbyReportRow: { alignItems: 'center', borderBottomColor: theme.colors.border.light, borderBottomWidth: 1, flexDirection: 'row', minHeight: 56, paddingVertical: 6 },
-  nearbyReportRowSelected: { backgroundColor: theme.colors.primaryLight, borderRadius: 12, borderBottomWidth: 0, marginVertical: 2, paddingHorizontal: theme.spacing.xs },
-  nearbyReportRowPressed: { opacity: 0.68 },
-  nearbyReportIcon: { alignItems: 'center', borderRadius: 12, height: 32, justifyContent: 'center', width: 32 },
-  nearbyReportCopy: { flex: 1, marginHorizontal: theme.spacing.sm },
-  nearbyReportTitle: { color: theme.colors.text, fontSize: 13, fontWeight: '800' },
-  nearbyReportMeta: { color: theme.colors.textSecondary, fontSize: 11, marginTop: 2 },
-  marker: {
-    alignItems: 'center',
-    borderColor: theme.colors.white,
-    borderRadius: 14,
-    borderWidth: 2,
-    elevation: 5,
-    height: 36,
-    justifyContent: 'center',
-    width: 36,
-  },
-  markerSelected: { borderColor: theme.colors.primaryDark, borderWidth: 3 },
-  bottomOverlay: { left: theme.spacing.md, position: 'absolute', right: theme.spacing.md },
-  reportDetailCard: {
-    backgroundColor: 'rgba(255,255,255,0.98)',
-    borderColor: theme.colors.border.light,
-    borderRadius: 20,
-    borderWidth: 1,
-    elevation: 7,
-    padding: 14,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-  },
-  reportDetailHeader: { alignItems: 'flex-start', flexDirection: 'row', justifyContent: 'space-between' },
+  nearbyReportsEmptyTitle: { color: theme.colors.text, fontSize: 15, fontWeight: '600', marginTop: 8 },
+  nearbyReportsEmptyText: { color: theme.colors.textSecondary, fontSize: 12, lineHeight: 18, marginTop: 4, textAlign: 'center' },
+  nearbyReportRow: { alignItems: 'center', borderBottomColor: theme.colors.border.light, borderBottomWidth: StyleSheet.hairlineWidth, flexDirection: 'row', minHeight: 74, paddingVertical: 12 },
+  nearbyReportRowSelected: { backgroundColor: theme.colors.primaryLight, borderRadius: 14, borderBottomWidth: 0, marginVertical: 2, paddingHorizontal: theme.spacing.sm },
+  nearbyReportRowPressed: { opacity: 0.7 },
+  nearbyReportIcon: { alignItems: 'center', borderRadius: 12, height: 36, justifyContent: 'center', width: 36 },
+  nearbyReportCopy: { flex: 1, marginHorizontal: 12 },
+  nearbyReportTitle: { color: theme.colors.text, fontSize: 15, fontWeight: '600' },
+  nearbyReportMeta: { color: theme.colors.textSecondary, fontSize: 12, marginTop: 4 },
+  bottomOverlay: { left: 14, position: 'absolute', right: 14 },
+  reportDetailCard: { backgroundColor: theme.colors.surface, borderRadius: 25, padding: 15, ...theme.shadows.large },
+  reportDetailHeader: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
   reportDetailTitleRow: { alignItems: 'center', flexDirection: 'row', flex: 1 },
-  reportDetailIcon: { alignItems: 'center', borderRadius: 11, height: 36, justifyContent: 'center', width: 36 },
-  reportDetailTitleCopy: { flex: 1, marginLeft: 6 },
-  reportDetailTitle: { color: theme.colors.text, fontSize: 17, fontWeight: '800' },
-  reportDetailAge: { color: theme.colors.textSecondary, fontSize: 12, marginTop: 2 },
+  reportDetailIcon: { alignItems: 'center', borderRadius: 12, height: 36, justifyContent: 'center', width: 36 },
+  reportDetailTitleCopy: { flex: 1, marginLeft: 10 },
+  reportDetailTitle: { color: theme.colors.text, fontSize: 17, fontWeight: '600' },
+  reportDetailAge: { color: theme.colors.textSecondary, fontSize: 12, marginTop: 3 },
   closeButton: { alignItems: 'center', borderRadius: 22, height: 44, justifyContent: 'center', marginLeft: theme.spacing.sm, width: 44 },
-  reportDetailDescription: { color: theme.colors.textSecondary, fontSize: 13, lineHeight: 18, marginTop: 6 },
-  verifyPrompt: { color: theme.colors.text, fontSize: 13, fontWeight: '700', marginTop: 6 },
-  verifyRow: { flexDirection: 'row', gap: 6, marginTop: theme.spacing.xs },
-  verifyButton: { alignItems: 'center', borderRadius: 12, flex: 1, minHeight: 44, paddingVertical: 10 },
-  confirmButton: { backgroundColor: '#E7F6EB' },
-  denyButton: { backgroundColor: '#FFF0EF' },
-  confirmButtonText: { color: '#24723E', fontSize: 13, fontWeight: '800' },
-  denyButtonText: { color: '#B43C36', fontSize: 13, fontWeight: '800' },
-  verifyDisabled: { color: theme.colors.textSecondary, fontSize: 12, marginTop: 6 },
-  verificationMessage: { color: theme.colors.primaryDark, fontSize: 12, fontWeight: '700', marginTop: 6 },
-  parkingSheet: {
-    backgroundColor: 'rgba(255,255,255,0.98)',
-    borderColor: theme.colors.border.light,
-    borderRadius: 18,
-    borderWidth: 1,
-    padding: 10,
-    ...theme.shadows.large,
-  },
-  parkingSheetTitle: { color: theme.colors.textSecondary, fontSize: 13, fontWeight: '800', marginBottom: 6, textAlign: 'center' },
-  parkingActionRow: { flexDirection: 'row', gap: 6 },
-  parkButton: { borderRadius: 12, flex: 1, minHeight: 48 },
-  parkButtonText: { fontSize: 15 },
-  reportActionButton: { alignItems: 'center', backgroundColor: theme.colors.primaryLight, borderRadius: 12, flexDirection: 'row', justifyContent: 'center', minHeight: 48, paddingHorizontal: 10 },
-  reportActionText: { color: theme.colors.primaryDark, fontSize: 13, fontWeight: '800', marginLeft: 4 },
-  reportActionButtonPressed: { opacity: 0.65 },
+  closeButtonIcon: { alignItems: 'center', backgroundColor: theme.colors.surfaceSubtle, borderRadius: 14, height: 28, justifyContent: 'center', width: 28 },
+  reportDetailDescription: { color: theme.colors.textSecondary, fontSize: 13, lineHeight: 19, marginTop: 8 },
+  verifyPrompt: { color: theme.colors.text, fontSize: 13, fontWeight: '500', marginTop: 12 },
+  verifyRow: { flexDirection: 'row', gap: 8, marginTop: 9 },
+  verifyButton: { alignItems: 'center', borderRadius: 15, flex: 1, flexDirection: 'row', gap: 6, justifyContent: 'center', minHeight: 46, paddingHorizontal: 6, paddingVertical: 10 },
+  confirmButton: { backgroundColor: theme.colors.primary },
+  denyButton: { backgroundColor: theme.colors.surfaceSubtle },
+  confirmButtonText: { color: theme.colors.white, fontSize: 13, fontWeight: '600' },
+  denyButtonText: { color: theme.colors.text, fontSize: 13, fontWeight: '600' },
+  verifyDisabled: { color: theme.colors.textSecondary, fontSize: 12, lineHeight: 18, marginTop: 10 },
+  verificationMessage: { color: theme.colors.primaryDark, fontSize: 12, fontWeight: '500', lineHeight: 18, marginTop: 10 },
+  parkingSheet: { backgroundColor: theme.colors.surface, borderRadius: 23, padding: 10, ...theme.shadows.large },
+  parkingSheetTitle: { color: theme.colors.textSecondary, fontSize: 13, fontWeight: '500', marginBottom: 10, marginLeft: 4, marginTop: 2 },
+  parkingActionRow: { flexDirection: 'row', gap: 8 },
+  parkButton: { borderRadius: 16, flex: 1, minHeight: 50, paddingHorizontal: 10 },
+  parkButtonText: { fontSize: 15, fontWeight: '600' },
+  reportActionButton: { alignItems: 'center', backgroundColor: theme.colors.surfaceSubtle, borderRadius: 16, flexDirection: 'row', justifyContent: 'center', minHeight: 50, paddingHorizontal: 14 },
+  reportActionText: { color: theme.colors.text, fontSize: 14, fontWeight: '600', marginLeft: 6 },
+  reportActionButtonPressed: { opacity: 0.7 },
 });
