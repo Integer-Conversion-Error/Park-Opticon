@@ -39,8 +39,8 @@ test('invalid credentials are rejected before an API request', async () => {
 
 test('email sign-in authenticates and guest action stays available', async () => {
   const view = await screen();
-  await fireEvent.changeText(view.getByPlaceholderText('you@example.com'), 'driver@example.com');
-  await fireEvent.changeText(view.getByPlaceholderText('At least 8 characters'), 'passphrase123');
+  await fireEvent.changeText(view.getByLabelText('Email'), 'driver@example.com');
+  await fireEvent.changeText(view.getByLabelText('Password'), 'passphrase123');
   await userEvent.press(view.getByRole('button', { name: 'Sign in' }));
   await waitFor(() => expect(api.login).toHaveBeenCalledWith({ email: 'driver@example.com', password: 'passphrase123' }));
   expect(onAuthenticated).toHaveBeenCalledTimes(1);
@@ -51,7 +51,7 @@ test('email sign-in authenticates and guest action stays available', async () =>
 test('registration derives a username and enters the authenticated app', async () => {
   const view = await screen();
   await userEvent.press(view.getByText('Create an account'));
-  await fireEvent.changeText(view.getByPlaceholderText('you@example.com'), ' newdriver@example.com ');
+  await fireEvent.changeText(view.getByLabelText('Email'), ' newdriver@example.com ');
   await fireEvent.changeText(view.getByPlaceholderText('At least 8 characters'), 'passphrase123');
   await userEvent.press(view.getByRole('button', { name: 'Create account' }));
   await waitFor(() => expect(api.register).toHaveBeenCalledWith({
